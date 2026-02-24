@@ -19,30 +19,9 @@ st.set_page_config(
 # ------------------------------------------------------------
 # FUNCIONES DE PROCESAMIENTO
 # ------------------------------------------------------------
-def extract_text_from_pdf(pdf_file):
-    """
-    Extrae texto de un archivo PDF
-    """
-    try:
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
-        text = ""
-        num_pages = len(pdf_reader.pages)
-        
-        for page_num, page in enumerate(pdf_reader.pages):
-            page_text = page.extract_text()
-            if page_text:
-                text += f"--- Página {page_num + 1} ---\n{page_text}\n\n"
-        
-        if not text.strip():
-            return "No se pudo extraer texto del PDF. Puede ser un documento escaneado o protegido.", num_pages
-        
-        return text, num_pages
-    except Exception as e:
-        return f"Error al leer el PDF: {str(e)}", 0
-
 def extract_invoice_data_smart(text):
     """
-    Versión mejorada con regex para extraer datos comunes de facturas colombianas
+    Versión mejorada para facturas colombianas
     """
     data = {
         "fecha": "No encontrada",
@@ -51,8 +30,88 @@ def extract_invoice_data_smart(text):
         "nit": "No encontrado",
         "total": "No encontrado",
         "iva": "No encontrado",
+        "subtotal": "No encontrado",
         "cufe": "No encontrado"
     }
+    
+    # Buscar fecha (formatos comunes)
+    fecha_patterns = [
+        r'Fecha[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
+        r'(\d{2}[/-]\d{2}[/-]\d{4})',
+    ]
+    for pattern in fecha_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            data["fecha"] = match.group(1)
+            break
+    
+    # Buscar número de factura (mejorado)
+    factura_patterns = [
+        r'Factura[:\s]*[Nn]?[oÓ]?\.?\s*([A-Z0-9-]+)',
+        r'FACTURA\s+([A-Z0-9-]+)',
+        r'No\.?\s*Factura[:\s]*([A-Z0-9-]+)',
+    ]
+    for pattern in factura_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            data["numero_factura"] = match.group(1)
+            break
+    
+    # Buscar proveedor (nombre de la empresa emisora)
+    lines = text.split('\n')
+    for i, line in enumerate(lines[:20]):
+        line = line.strip()
+        if (len(line) > 5 and 
+            any(word in line.upper() for word in ['S.A.S', 'LTDA', 'SAS', 'LIMITADA']) or
+            (line.isupper() and len(line.split()) > 1 and not re.search(r'\d{5,}', line))):
+            data["proveedor"] = line
+            break
+    
+    # Buscar NIT (mejorado para formato colombiano)
+    nit_patterns = [
+        r'NIT[:\s]*([0-9.-]+)',
+        r'([0-9]{9,10})',
+        r'([0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9])'
+    ]
+    for pattern in nit_patterns:
+        match = re.search(pattern, text)
+        if match:
+            data["nit"] = match.group(1)
+            break
+    
+    # Buscar TOTAL (ahora busca específicamente después de la palabra TOTAL)
+    total_match = re.search(r'TOTAL[:\s]*[$]?\s*([0-9.,]+)', text, re.IGNORECASE)
+    if total_match:
+        data["total"] = total_match.group(1)
+    else:
+        # Si no encuentra TOTAL, busca al final del documento
+        numbers = re.findall(r'[$]?\s*([0-9.,]+)', text)
+        if numbers:
+            data["total"] = numbers[-1]  # Toma el último número grande (suele ser el total)
+    
+    # Buscar IVA (mejorado)
+    iva_patterns = [
+        r'IVA[:\s]*[$]?\s*([0-9.,]+)',
+        r'IVA\s*19%[:\s]*[$]?\s*([0-9.,]+)',
+        r'Impuesto[:\s]*[$]?\s*([0-9.,]+)',
+    ]
+    for pattern in iva_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            data["iva"] = match.group(1)
+            break
+    
+    # Buscar subtotal (útil para verificación)
+    subtotal_match = re.search(r'Subtotal[:\s]*[$]?\s*([0-9.,]+)', text, re.IGNORECASE)
+    if subtotal_match:
+        data["subtotal"] = subtotal_match.group(1)
+    
+    # Buscar CUFE (para facturas electrónicas colombianas)
+    cufe_match = re.search(r'([a-f0-9]{32,})', text, re.IGNORECASE)
+    if cufe_match:
+        data["cufe"] = cufe_match.group(1)
+    
+    return data
     
     # Buscar fecha (formatos comunes: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD)
     fecha_patterns = [
