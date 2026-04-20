@@ -86,7 +86,7 @@ def pantalla_login():
         """, unsafe_allow_html=True)
 
 def app_principal():
-    base = Path(__file__).parent / "pages"
+    base = Path(__file__).parent
 
     with st.sidebar:
         st.markdown("""
