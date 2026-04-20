@@ -15,5 +15,3 @@ enableWebsocketCompression = false
 
 [browser]
 gatherUsageStats = false
-serverAddress = "app.salazanalytics.com"
-serverPort = 443
