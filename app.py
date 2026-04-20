@@ -1,5 +1,8 @@
 import streamlit as st
 import hashlib
+from pathlib import Path
+import importlib.util
+import sys
 
 st.set_page_config(
     page_title="SalazAnalytics",
@@ -42,6 +45,13 @@ def check_password(usuario, password):
         return False
     return USUARIOS[usuario] == hashlib.sha256(password.encode()).hexdigest()
 
+def load_module(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
 def pantalla_login():
     st.markdown("<br><br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -49,8 +59,10 @@ def pantalla_login():
         st.markdown("""
         <div style="background:#132030;border:1px solid #1a3a5c;border-radius:16px;
                     padding:2.5rem;text-align:center;margin-bottom:2rem;">
-            <h1 style="color:#00C2FF;font-size:1.8rem;margin-bottom:.3rem;">📊 SalazAnalytics</h1>
-            <p style="color:#7B9BB5;font-size:.9rem;margin:0;">Ingresa tus credenciales para acceder</p>
+            <h1 style="color:#00C2FF;font-size:1.8rem;margin-bottom:.3rem;">
+                📊 SalazAnalytics</h1>
+            <p style="color:#7B9BB5;font-size:.9rem;margin:0;">
+                Ingresa tus credenciales para acceder</p>
         </div>
         """, unsafe_allow_html=True)
         usuario = st.text_input("👤 Usuario", placeholder="Tu usuario")
@@ -66,7 +78,7 @@ def pantalla_login():
         st.markdown("""
         <div style="text-align:center;margin-top:1rem;">
             <p style="color:#7B9BB5;font-size:.8rem;">
-                ¿No tienes acceso? 
+                ¿No tienes acceso?
                 <a href="https://salazanalytics.com/contacto" target="_blank"
                    style="color:#00C2FF;text-decoration:none;">Solicita acceso aquí</a>
             </p>
@@ -74,11 +86,15 @@ def pantalla_login():
         """, unsafe_allow_html=True)
 
 def app_principal():
+    base = Path(__file__).parent / "pages"
+
     with st.sidebar:
         st.markdown("""
         <div style="text-align:center;padding:1.5rem 0 1rem;">
-            <h2 style="color:#00C2FF;font-size:1.4rem;font-weight:700;margin:0;">📊 SalazAnalytics</h2>
-            <p style="color:#7B9BB5;font-size:0.75rem;margin:0;">Plataforma de Análisis con IA</p>
+            <h2 style="color:#00C2FF;font-size:1.4rem;font-weight:700;margin:0;">
+                📊 SalazAnalytics</h2>
+            <p style="color:#7B9BB5;font-size:0.75rem;margin:0;">
+                Plataforma de Análisis con IA</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -86,8 +102,10 @@ def app_principal():
         <div style="background:#0a1520;border:1px solid #1a3a5c;border-radius:8px;
                     padding:.7rem 1rem;margin-bottom:1rem;text-align:center;">
             <p style="color:#7B9BB5;font-size:.75rem;margin:0;">Conectado como</p>
-            <p style="color:#00C2FF;font-weight:600;font-size:.9rem;margin:0;">{st.session_state.get('usuario','')}</p>
-            <p style="color:#7B2FBE;font-size:.72rem;margin:0;">{st.session_state.get('rol','')}</p>
+            <p style="color:#00C2FF;font-weight:600;font-size:.9rem;margin:0;">
+                {st.session_state.get('usuario','')}</p>
+            <p style="color:#7B2FBE;font-size:.72rem;margin:0;">
+                {st.session_state.get('rol','')}</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -108,7 +126,6 @@ def app_principal():
             st.session_state["pagina_actual"] = "🏠 Inicio"
 
         for opcion in opciones:
-            estilo = "primary" if st.session_state.get("pagina_actual") == opcion else "secondary"
             if st.button(opcion, use_container_width=True, key=f"nav_{opcion}"):
                 st.session_state["pagina_actual"] = opcion
                 st.rerun()
@@ -120,19 +137,20 @@ def app_principal():
                 del st.session_state[key]
             st.rerun()
 
-        st.markdown("<p style='color:#7B9BB5;font-size:.75rem;text-align:center'>salazanalytics.com</p>",
-                    unsafe_allow_html=True)
+        st.markdown(
+            "<p style='color:#7B9BB5;font-size:.75rem;text-align:center'>salazanalytics.com</p>",
+            unsafe_allow_html=True)
 
     page = st.session_state.get("pagina_actual", "🏠 Inicio")
 
-    if   "Inicio"     in page: from pages import home;          home.show()
-    elif "Excel"      in page: from pages import excel_ia;      excel_ia.show()
-    elif "PDF"        in page: from pages import pdf_ia;        pdf_ia.show()
-    elif "Chat"       in page: from pages import chat_datos;    chat_datos.show()
-    elif "Dashboards" in page: from pages import dashboards;    dashboards.show()
-    elif "Predicción" in page: from pages import ml_prediccion; ml_prediccion.show()
-    elif "Anomalías"  in page: from pages import anomalias;     anomalias.show()
-    elif "Exportar"   in page: from pages import exportar;      exportar.show()
+    if   "Inicio"     in page: load_module("home", base/"home.py").show()
+    elif "Excel"      in page: load_module("excel_ia", base/"excel_ia.py").show()
+    elif "PDF"        in page: load_module("pdf_ia", base/"pdf_ia.py").show()
+    elif "Chat"       in page: load_module("chat_datos", base/"chat_datos.py").show()
+    elif "Dashboards" in page: load_module("dashboards", base/"dashboards.py").show()
+    elif "Predicción" in page: load_module("ml_prediccion", base/"ml_prediccion.py").show()
+    elif "Anomalías"  in page: load_module("anomalias", base/"anomalias.py").show()
+    elif "Exportar"   in page: load_module("exportar", base/"exportar.py").show()
 
 if not st.session_state.get("logged_in"):
     pantalla_login()
