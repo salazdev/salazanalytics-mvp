@@ -142,7 +142,11 @@ def app_principal():
             unsafe_allow_html=True)
 
     page = st.session_state.get("pagina_actual", "🏠 Inicio")
-
+    
+    st.write(f"Pagina actual: {page}")
+    st.write(f"Archivo: {base / '_excel_ia.py'}")
+    st.write(f"Existe: {(base / '_excel_ia.py').exists()}")
+    
     if   "Inicio"     in page: load_module("home", base/"_home.py").show()
     elif "Excel"      in page: load_module("excel_ia", base/"_excel_ia.py").show()
     elif "PDF"        in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
