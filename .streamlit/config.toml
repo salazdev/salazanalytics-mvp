@@ -17,3 +17,5 @@ enableWebsocketCompression = false
 gatherUsageStats = false
 [runner]
 fastReruns = false
+[ui]
+hideSidebarNav = true
