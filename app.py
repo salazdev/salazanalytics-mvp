@@ -3,6 +3,8 @@ import hashlib
 import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
+import sys
+sys.path.insert(0, ".")
 
 st.set_page_config(
     page_title="SalazAnalytics — Plataforma de Análisis",
