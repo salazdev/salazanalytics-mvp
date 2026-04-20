@@ -11,6 +11,9 @@ headless = true
 port = 8501
 enableCORS = false
 enableXsrfProtection = false
+enableWebsocketCompression = false
 
 [browser]
 gatherUsageStats = false
+serverAddress = "app.salazanalytics.com"
+serverPort = 443
