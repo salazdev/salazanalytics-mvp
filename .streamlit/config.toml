@@ -15,3 +15,5 @@ enableWebsocketCompression = false
 
 [browser]
 gatherUsageStats = false
+[runner]
+fastReruns = false
