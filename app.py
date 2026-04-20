@@ -113,20 +113,23 @@ def app_principal():
 
         st.divider()
 
-        page = st.radio(
-            "Módulos",
-            [
-                "🏠  Inicio",
-                "📗  Análisis de Excel",
-                "📄  Análisis de PDF",
-                "💬  Chat con tus datos",
-                "📈  Dashboards",
-                "🤖  Predicción con ML",
-                "🔍  Detección de anomalías",
-                "📑  Exportar Reporte",
-            ],
-            label_visibility="collapsed",
-        )
+        opciones = [
+            "🏠 Inicio",
+            "📗 Excel con IA",
+            "📄 PDF con IA",
+            "💬 Chat con datos",
+            "📈 Dashboards",
+            "🤖 Predicción ML",
+            "🔍 Anomalías",
+            "📑 Exportar",
+        ]
+
+        if "pagina_actual" not in st.session_state:
+            st.session_state["pagina_actual"] = "🏠 Inicio"
+
+        for opcion in opciones:
+            if st.button(opcion, use_container_width=True, key=f"btn_{opcion}"):
+                st.session_state["pagina_actual"] = opcion
 
         st.divider()
 
@@ -138,16 +141,13 @@ def app_principal():
         st.markdown("<p style='color:#7B9BB5;font-size:.75rem;text-align:center'>salazanalytics.com</p>",
                     unsafe_allow_html=True)
 
-    if   "Inicio"      in page: from pages import home;          home.show()
-    elif "Excel"       in page: from pages import excel_ia;      excel_ia.show()
-    elif "PDF"         in page: from pages import pdf_ia;        pdf_ia.show()
-    elif "Chat"        in page: from pages import chat_datos;    chat_datos.show()
-    elif "Dashboards"  in page: from pages import dashboards;    dashboards.show()
-    elif "Predicción"  in page: from pages import ml_prediccion; ml_prediccion.show()
-    elif "anomalías"   in page: from pages import anomalias;     anomalias.show()
-    elif "Exportar"    in page: from pages import exportar;      exportar.show()
+    page = st.session_state.get("pagina_actual", "🏠 Inicio")
 
-if not st.session_state.get("logged_in"):
-    pantalla_login()
-else:
-    app_principal()
+    if   "Inicio"    in page: from pages import home;          home.show()
+    elif "Excel"     in page: from pages import excel_ia;      excel_ia.show()
+    elif "PDF"       in page: from pages import pdf_ia;        pdf_ia.show()
+    elif "Chat"      in page: from pages import chat_datos;    chat_datos.show()
+    elif "Dashboards" in page: from pages import dashboards;   dashboards.show()
+    elif "Predicción" in page: from pages import ml_prediccion; ml_prediccion.show()
+    elif "Anomalías" in page: from pages import anomalias;     anomalias.show()
+    elif "Exportar"  in page: from pages import exportar;      exportar.show()
