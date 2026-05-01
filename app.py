@@ -113,13 +113,13 @@ def app_principal():
 
         opciones = [
             "🏠 Inicio",
-            "📗 Excel con IA",
-            "📄 PDF con IA",
-            "💬 Chat con datos",
-            "📈 Dashboards",
-            "🤖 Predicción ML",
-            "🔍 Anomalías",
-            "📑 Exportar",
+            "⚖️ Revisoría & Cumplimiento",  # Nuevo: Cámara de Comercio + Reglas
+            "🔮 Mirofish Predictor",        # Tu motor de predicción
+            "📊 Dashboards Financieros",
+            "📗 Auditoría de Excel",
+            "💬 Consultor Contable IA",     # Chat con RAG (Estatuto Tributario)
+            "⚙️ Automatización (n8n)",      # Estado de los flujos
+            "🚪 Cerrar sesión"
         ]
 
         if "pagina_actual" not in st.session_state:
