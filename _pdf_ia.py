@@ -1,6 +1,20 @@
 import streamlit as st
 import anthropic
 import base64
+import requests
+
+def procesar_con_n8n(file_bytes, file_name, tipo_analisis):
+    # URL de tu Webhook de n8n
+    webhook_url = "https://tu-n8n.com/webhook/analisis-contable"
+    
+    files = {"file": (file_name, file_bytes)}
+    data = {"tipo": tipo_analisis, "usuario": st.session_state["usuario"]}
+    
+    try:
+        response = requests.post(webhook_url, files=files, data=data)
+        return response.json() # n8n devuelve el análisis
+    except Exception as e:
+        return {"error": str(e)}
 
 def call_claude_pdf(pdf_b64, prompt, api_key):
     client = anthropic.Anthropic(api_key=api_key)
