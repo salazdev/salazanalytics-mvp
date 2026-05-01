@@ -3,6 +3,16 @@ import anthropic
 import base64
 import requests
 
+# Ejemplo de envío al webhook de n8n en Easypanel
+import requests
+
+def analizar_documento(archivo_pdf):
+    # Usamos la URL interna si n8n está en el mismo proyecto de Easypanel
+    url_n8n = "http://n8n:5678/webhook/tu-ruta-analisis" 
+    files = {"file": archivo_pdf.getvalue()}
+    response = requests.post(url_n8n, files=files)
+    return response.json()
+
 def procesar_con_n8n(file_bytes, file_name, tipo_analisis):
     # URL de tu Webhook de n8n
     webhook_url = "https://tu-n8n.com/webhook/analisis-contable"
