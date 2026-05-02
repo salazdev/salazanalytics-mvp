@@ -110,4 +110,58 @@ def app_principal():
         <div style="background:#0a1520;border:1px solid #1a3a5c;border-radius:8px;
                     padding:.7rem 1rem;margin-bottom:1rem;text-align:center;">
             <p style="color:#7B9BB5;font-size:.75rem;margin:0;">Conectado como</p>
-            <p style="color:#00C2FF;font-weight:600;font-size:.9rem;margin:0;"
+            <p style="color:#00C2FF;font-weight:600;font-size:.9rem;margin:0;">
+                {st.session_state.get('usuario','')}</p>
+            <p style="color:#7B2FBE;font-size:.72rem;margin:0;">
+                {st.session_state.get('rol','')}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.divider()
+
+        opciones = [
+            "🏠 Inicio",
+            "⚖️ Revisoria y Cumplimiento",
+            "🔮 Mirofish Predictor",
+            "📊 Dashboards Financieros",
+            "📗 Auditoria de Excel",
+            "💬 Consultor Contable IA",
+            "⚙️ Automatizacion n8n",
+            "🔍 Anomalias",
+            "📑 Exportar",
+        ]
+
+        if "pagina_actual" not in st.session_state:
+            st.session_state["pagina_actual"] = "🏠 Inicio"
+
+        for opcion in opciones:
+            if st.button(opcion, use_container_width=True, key=f"nav_{opcion}"):
+                st.session_state["pagina_actual"] = opcion
+                st.rerun()
+
+        st.divider()
+
+        if st.button("Cerrar sesion", use_container_width=True):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
+
+        st.markdown(
+            "<p style='color:#7B9BB5;font-size:.75rem;text-align:center'>salazanalytics.com</p>",
+            unsafe_allow_html=True)
+
+    page = st.session_state.get("pagina_actual", "🏠 Inicio")
+
+    if   "Inicio"       in page: load_module("home", base/"_home.py").show()
+    elif "Revisoria"    in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
+    elif "Mirofish"     in page: load_module("ml_prediccion", base/"_ml_prediccion.py").show()
+    elif "Dashboards"   in page: load_module("dashboards", base/"_dashboards.py").show()
+    elif "Excel"        in page: load_module("excel_ia", base/"_excel_ia.py").show()
+    elif "Consultor"    in page: load_module("chat_datos", base/"_chat_datos.py").show()
+    elif "Anomalias"    in page: load_module("anomalias", base/"_anomalias.py").show()
+    elif "Exportar"     in page: load_module("exportar", base/"_exportar.py").show()
+
+if not st.session_state.get("logged_in"):
+    pantalla_login()
+else:
+    app_principal()
