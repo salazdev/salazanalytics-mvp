@@ -6,6 +6,44 @@ import json, anthropic
 
 PALETTE = ["#00C2FF", "#7B2FBE", "#00FFB3", "#FF6B6B", "#FFD93D", "#4ECDC4"]
 
+def show():
+    st.header("📗 Excel con IA + Función Pivotar")
+    
+    file = st.file_uploader("Sube tu archivo de Excel", type=["xlsx", "csv"])
+    
+    if file:
+        df = pd.read_data(file) # Dependiendo de la extensión
+        st.write("### Vista previa de datos", df.head())
+        
+        st.markdown("---")
+        st.subheader("🛠️ Configuración de PIVOTARPOR (Simulado)")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            filas = st.selectbox("Filas (Row Fields)", df.columns)
+        with col2:
+            columnas = st.selectbox("Columnas (Column Fields)", df.columns)
+        with col3:
+            valores = st.selectbox("Valores (Values)", df.columns)
+            
+        metrica = st.selectbox("Función de agregación", ["sum", "mean", "count"])
+
+        if st.button("Generar Tabla Dinámica"):
+            # Aquí replicamos la lógica de PIVOTARPOR
+            pivot_df = df.pivot_table(
+                values=valores, 
+                index=filas, 
+                columns=columnas, 
+                aggfunc=metrica,
+                margins=True, # Esto agrega los totales, igual que la función de Excel
+                margins_name="Total General"
+            )
+            st.dataframe(pivot_df, use_container_width=True)
+            
+            # Opción de enviar este resumen a Mirofish vía n8n
+            if st.button("🔮 Predecir tendencia de esta tabla"):
+                enviar_a_n8n(pivot_df.to_json())
+
 def call_claude(prompt, system=""):
     client = anthropic.Anthropic(api_key=st.session_state.get("api_key", ""))
     msg = client.messages.create(
@@ -41,6 +79,7 @@ def show():
     except Exception as e:
         st.error(f"Error al leer el archivo: {e}")
         return
+
 
     sheet_name = st.selectbox("Selecciona la hoja", list(all_sheets.keys()))
     df = all_sheets[sheet_name]
