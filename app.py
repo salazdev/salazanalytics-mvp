@@ -64,7 +64,7 @@ def load_module(name, path):
     return mod
 
 def mostrar_logo(width=220):
-    with open(Path(__file__).parent / "logo.png", "rb") as f:
+    with open(Path(__file__).parent / "logo-salazanalytics.png", "rb") as f:
         data = base64.b64encode(f.read()).decode()
     st.markdown(
         f'<img src="data:image/png;base64,{data}" style="width:{width}px;display:block;margin:0 auto;">',
