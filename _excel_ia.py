@@ -71,7 +71,7 @@ def show():
             opciones_color = ["ninguno"] + cols_cat
             color_sel = st.selectbox("Color por (opcional)", opciones_color)
             color_col = None if color_sel == "ninguno" else color_sel
-            common = dict(color_discrete_sequence=PALETTE, template="plotly_dark")
+            common = dict(color_discrete_sequence=PALETTE, template="plotly_dark", color_discrete_map={})
             if chart_type == "Barras":
                 fig = px.bar(df, x=col_x, y=col_y, color=color_col, **common)
             elif chart_type == "Linea":
@@ -85,7 +85,14 @@ def show():
             else:
                 corr = df[cols_num].corr()
                 fig = px.imshow(corr, text_auto=True, color_continuous_scale="Blues", template="plotly_dark")
-            fig.update_layout(paper_bgcolor="#0D1B2A", plot_bgcolor="#0D1B2A", font_color="#E8F4FD", margin=dict(t=30, b=30))
+            fig.update_layout(
+                paper_bgcolor="#0D1B2A", 
+                plot_bgcolor="#132030", 
+                font_color="#E8F4FD", 
+                margin=dict(t=30, b=30),
+                bargap=0.2
+            )
+            fig.update_traces(marker_color="#00C2FF")
             st.plotly_chart(fig, use_container_width=True)
 
     with tab3:
