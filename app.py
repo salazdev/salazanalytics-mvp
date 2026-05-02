@@ -105,10 +105,7 @@ def app_principal():
     with st.sidebar:
         st.markdown("""
         <div style="text-align:center;padding:1.5rem 0 1rem;">
-            <h2 style="color:#00C2FF;font-size:1.4rem;font-weight:700;margin:0;">
-                📊 SalazAnalytics</h2>
-            <p style="color:#7B9BB5;font-size:0.75rem;margin:0;">
-                Plataforma de Análisis con IA</p>
+            {LOGO_HTML}
         </div>
         """, unsafe_allow_html=True)
 
@@ -167,6 +164,6 @@ def app_principal():
     elif "Exportar"    in page: load_module("exportar", base/"_exportar.py").show()
 
 if not st.session_state.get("logged_in"):
-    pantalla_login()
+  {LOGO_HTML}
 else:
-    app_principal()
+  app_principal()
