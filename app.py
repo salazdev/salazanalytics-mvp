@@ -5,29 +5,15 @@ import importlib.util
 import sys
 import base64
 
-LOGO_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" width="260" height="70" viewBox="0 0 260 70">
+LOGO_SVG = b'''<svg xmlns="http://www.w3.org/2000/svg" width="260" height="70" viewBox="0 0 260 70">
   <line x1="10" y1="35" x2="25" y2="35" stroke="#1a3a5c" stroke-width="1.5"/>
   <polyline points="25,35 30,35 34,18 39,52 44,28 49,42 53,35 70,35" fill="none" stroke="#00C2FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   <circle cx="34" cy="18" r="3" fill="#7B2FBE"/>
   <circle cx="44" cy="28" r="2" fill="#00C2FF"/>
   <line x1="70" y1="35" x2="80" y2="35" stroke="#1a3a5c" stroke-width="1.5"/>
-  <text x="88" y="41" fill="#E8F4FD" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" letter-spacing="-0.5">Salaz<tspan fill="#00C2FF">Analytics</tspan></text>
-  <text x="89" y="55" fill="#7B9BB5" font-family="Segoe UI,Arial,sans-serif" font-size="9" letter-spacing="4">DATA  INTELLIGENCE</text>
+  <text x="88" y="41" fill="#E8F4FD" font-family="Arial,sans-serif" font-size="24" font-weight="700">Salaz<tspan fill="#00C2FF">Analytics</tspan></text>
+  <text x="89" y="55" fill="#7B9BB5" font-family="Arial,sans-serif" font-size="9" letter-spacing="4">DATA  INTELLIGENCE</text>
 </svg>'''
-
-LOGO_B64 = base64.b64encode(LOGO_SVG.encode()).decode()
-LOGO_HTML = '''
-<div style="text-align:center;padding:.5rem 0;">
-  <svg xmlns="http://www.w3.org/2000/svg" width="200" height="54" viewBox="0 0 260 70">
-    <line x1="10" y1="35" x2="25" y2="35" stroke="#1a3a5c" stroke-width="1.5"/>
-    <polyline points="25,35 30,35 34,18 39,52 44,28 49,42 53,35 70,35" fill="none" stroke="#00C2FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="34" cy="18" r="3" fill="#7B2FBE"/>
-    <circle cx="44" cy="28" r="2" fill="#00C2FF"/>
-    <line x1="70" y1="35" x2="80" y2="35" stroke="#1a3a5c" stroke-width="1.5"/>
-    <text x="88" y="41" fill="#E8F4FD" font-family="Arial,sans-serif" font-size="24" font-weight="700">Salaz<tspan fill="#00C2FF">Analytics</tspan></text>
-    <text x="89" y="55" fill="#7B9BB5" font-family="Arial,sans-serif" font-size="9" letter-spacing="4">DATA  INTELLIGENCE</text>
-  </svg>
-</div>'''
 
 st.set_page_config(
     page_title="SalazAnalytics",
@@ -77,14 +63,19 @@ def load_module(name, path):
     spec.loader.exec_module(mod)
     return mod
 
+def mostrar_logo(width=220):
+    st.image(LOGO_SVG, width=width)
+
 def pantalla_login():
     st.markdown("<br><br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown(f"""
+        st.markdown("""
         <div style="background:#132030;border:1px solid #1a3a5c;border-radius:16px;
                     padding:2.5rem;text-align:center;margin-bottom:2rem;">
-            {LOGO_HTML}
+        """, unsafe_allow_html=True)
+        mostrar_logo(width=200)
+        st.markdown("""
             <p style="color:#7B9BB5;font-size:.9rem;margin-top:1rem;">
                 Ingresa tus credenciales para acceder</p>
         </div>
@@ -113,68 +104,10 @@ def app_principal():
     base = Path(__file__).parent
 
     with st.sidebar:
-        st.markdown(f"""
-        <div style="text-align:center;padding:1.5rem 0 1rem;">
-            {LOGO_HTML}
-        </div>
-        """, unsafe_allow_html=True)
+        mostrar_logo(width=200)
 
         st.markdown(f"""
         <div style="background:#0a1520;border:1px solid #1a3a5c;border-radius:8px;
                     padding:.7rem 1rem;margin-bottom:1rem;text-align:center;">
             <p style="color:#7B9BB5;font-size:.75rem;margin:0;">Conectado como</p>
-            <p style="color:#00C2FF;font-weight:600;font-size:.9rem;margin:0;">
-                {st.session_state.get('usuario','')}</p>
-            <p style="color:#7B2FBE;font-size:.72rem;margin:0;">
-                {st.session_state.get('rol','')}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.divider()
-
-        opciones = [
-            "🏠 Inicio",
-            "⚖️ Revisoria y Cumplimiento",
-            "🔮 Mirofish Predictor",
-            "📊 Dashboards Financieros",
-            "📗 Auditoria de Excel",
-            "💬 Consultor Contable IA",
-            "⚙️ Automatizacion n8n",
-            "🔍 Anomalias",
-            "📑 Exportar",
-        ]
-
-        if "pagina_actual" not in st.session_state:
-            st.session_state["pagina_actual"] = "🏠 Inicio"
-
-        for opcion in opciones:
-            if st.button(opcion, use_container_width=True, key=f"nav_{opcion}"):
-                st.session_state["pagina_actual"] = opcion
-                st.rerun()
-
-        st.divider()
-
-        if st.button("Cerrar sesion", use_container_width=True):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
-
-        st.markdown(
-            "<p style='color:#7B9BB5;font-size:.75rem;text-align:center'>salazanalytics.com</p>",
-            unsafe_allow_html=True)
-
-    page = st.session_state.get("pagina_actual", "🏠 Inicio")
-
-    if   "Inicio"       in page: load_module("home", base/"_home.py").show()
-    elif "Revisoria"    in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
-    elif "Mirofish"     in page: load_module("ml_prediccion", base/"_ml_prediccion.py").show()
-    elif "Dashboards"   in page: load_module("dashboards", base/"_dashboards.py").show()
-    elif "Excel"        in page: load_module("excel_ia", base/"_excel_ia.py").show()
-    elif "Consultor"    in page: load_module("chat_datos", base/"_chat_datos.py").show()
-    elif "Anomalias"    in page: load_module("anomalias", base/"_anomalias.py").show()
-    elif "Exportar"     in page: load_module("exportar", base/"_exportar.py").show()
-
-if not st.session_state.get("logged_in"):
-    pantalla_login()
-else:
-    app_principal()
+            <p style="color:#00C2FF;font-weight:600;font-size:.9rem;margin:0;"
