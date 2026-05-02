@@ -158,7 +158,10 @@ def app_principal():
     page = st.session_state.get("pagina_actual", "🏠 Inicio")
 
     if   "Inicio"       in page: load_module("home", base/"_home.py").show()
-    elif "Revisor"      in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
+    elif "PDF"          in page:
+      st.write(f"Buscando: {base / '_pdf_ia.py'}")
+      st.write(f"Existe: {(base / '_pdf_ia.py').exists()}")
+      load_module("pdf_ia", base/"_pdf_ia.py").show()
     elif "Mirofish"     in page: load_module("ml_prediccion", base/"_ml_prediccion.py").show()
     elif "Dashboards"   in page: load_module("dashboards", base/"_dashboards.py").show()
     elif "Excel"        in page: load_module("excel_ia", base/"_excel_ia.py").show()
