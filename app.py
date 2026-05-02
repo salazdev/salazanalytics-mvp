@@ -126,7 +126,7 @@ def app_principal():
 
         opciones = [
             "🏠 Inicio",
-            "⚖️ Revisoria y Cumplimiento",
+            "📄 PDF con IA",
             "🔮 Mirofish Predictor",
             "📊 Dashboards Financieros",
             "📗 Auditoria de Excel",
