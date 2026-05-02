@@ -142,15 +142,15 @@ def app_principal():
             unsafe_allow_html=True)
 
     page = st.session_state.get("pagina_actual", "🏠 Inicio")
-    
-    if   "Inicio"     in page: load_module("home", base/"_home.py").show()
-    elif "Excel"      in page: load_module("excel_ia", base/"_excel_ia.py").show()
-    elif "PDF"        in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
-    elif "Chat"       in page: load_module("chat_datos", base/"_chat_datos.py").show()
-    elif "Dashboards" in page: load_module("dashboards", base/"_dashboards.py").show()
-    elif "Predicción" in page: load_module("ml_prediccion", base/"_ml_prediccion.py").show()
-    elif "Anomalías"  in page: load_module("anomalias", base/"_anomalias.py").show()
-    elif "Exportar"   in page: load_module("exportar", base/"_exportar.py").show()
+
+    if   "Inicio"      in page: load_module("home", base/"_home.py").show()
+    elif "Revisoría"   in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
+    elif "Mirofish"    in page: load_module("ml_prediccion", base/"_ml_prediccion.py").show()
+    elif "Dashboards"  in page: load_module("dashboards", base/"_dashboards.py").show()
+    elif "Excel"       in page: load_module("excel_ia", base/"_excel_ia.py").show()
+    elif "Consultor"   in page: load_module("chat_datos", base/"_chat_datos.py").show()
+    elif "Anomalías"   in page: load_module("anomalias", base/"_anomalias.py").show()
+    elif "Exportar"    in page: load_module("exportar", base/"_exportar.py").show()
 
 if not st.session_state.get("logged_in"):
     pantalla_login()
