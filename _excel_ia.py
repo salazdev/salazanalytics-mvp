@@ -1,48 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-import json, anthropic
+import anthropic
 
 PALETTE = ["#00C2FF", "#7B2FBE", "#00FFB3", "#FF6B6B", "#FFD93D", "#4ECDC4"]
-
-def show():
-    st.header("📗 Excel con IA + Función Pivotar")
-    
-    file = st.file_uploader("Sube tu archivo de Excel", type=["xlsx", "csv"])
-    
-    if file:
-        df = pd.read_data(file) # Dependiendo de la extensión
-        st.write("### Vista previa de datos", df.head())
-        
-        st.markdown("---")
-        st.subheader("🛠️ Configuración de PIVOTARPOR (Simulado)")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            filas = st.selectbox("Filas (Row Fields)", df.columns)
-        with col2:
-            columnas = st.selectbox("Columnas (Column Fields)", df.columns)
-        with col3:
-            valores = st.selectbox("Valores (Values)", df.columns)
-            
-        metrica = st.selectbox("Función de agregación", ["sum", "mean", "count"])
-
-        if st.button("Generar Tabla Dinámica"):
-            # Aquí replicamos la lógica de PIVOTARPOR
-            pivot_df = df.pivot_table(
-                values=valores, 
-                index=filas, 
-                columns=columnas, 
-                aggfunc=metrica,
-                margins=True, # Esto agrega los totales, igual que la función de Excel
-                margins_name="Total General"
-            )
-            st.dataframe(pivot_df, use_container_width=True)
-            
-            # Opción de enviar este resumen a Mirofish vía n8n
-            if st.button("🔮 Predecir tendencia de esta tabla"):
-                enviar_a_n8n(pivot_df.to_json())
 
 def call_claude(prompt, system=""):
     client = anthropic.Anthropic(api_key=st.session_state.get("api_key", ""))
@@ -55,9 +16,9 @@ def call_claude(prompt, system=""):
     return msg.content[0].text
 
 def show():
-    st.markdown("## 📗 Análisis de Excel con IA")
+    st.markdown("## Excel con IA")
 
-    with st.expander("🔑 Configurar API Key de Anthropic", expanded=not st.session_state.get("api_key")):
+    with st.expander("Configurar API Key de Anthropic", expanded=not st.session_state.get("api_key")):
         key = st.text_input("API Key", type="password", value=st.session_state.get("api_key", ""))
         if st.button("Guardar"):
             st.session_state["api_key"] = key
@@ -71,7 +32,7 @@ def show():
         st.session_state["file_ext"] = "xlsx"
 
     if not f:
-        st.info("👆 Sube un archivo Excel para comenzar el análisis.")
+        st.info("Sube un archivo Excel para comenzar el analisis.")
         return
 
     try:
@@ -80,13 +41,12 @@ def show():
         st.error(f"Error al leer el archivo: {e}")
         return
 
-
     sheet_name = st.selectbox("Selecciona la hoja", list(all_sheets.keys()))
     df = all_sheets[sheet_name]
     st.session_state["df"] = df
     st.markdown(f"**{len(df)} filas · {len(df.columns)} columnas**")
 
-    tab1, tab2, tab3, tab4 = st.tabs(["📋 Vista previa", "📊 Gráficas", "🤖 Análisis IA", "📐 Estadísticas"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Vista previa", "Graficas", "Analisis IA", "Estadisticas"])
 
     with tab1:
         st.dataframe(df.head(100), use_container_width=True, height=350)
@@ -96,27 +56,27 @@ def show():
             c1.metric("Filas", len(df))
             c2.metric("Columnas", len(df.columns))
             c3.metric("Nulos", int(df.isnull().sum().sum()))
-            c4.metric("Numéricos", len(cols_num))
+            c4.metric("Numericos", len(cols_num))
 
     with tab2:
         cols_num = df.select_dtypes("number").columns.tolist()
         cols_cat = df.select_dtypes("object").columns.tolist()
         if not cols_num:
-            st.warning("No se encontraron columnas numéricas.")
+            st.warning("No se encontraron columnas numericas.")
         else:
-            chart_type = st.selectbox("Tipo de gráfica", ["Barras", "Línea", "Dispersión", "Histograma", "Pastel", "Mapa de calor"])
+            chart_type = st.selectbox("Tipo de grafica", ["Barras", "Linea", "Dispersion", "Histograma", "Pastel", "Mapa de calor"])
             col_y = st.selectbox("Eje Y / Valor", cols_num)
             opciones_x = cols_cat + cols_num
-            col_x = st.selectbox("Eje X / Categoría", opciones_x)
-            opciones_color = ["—"] + cols_cat
+            col_x = st.selectbox("Eje X / Categoria", opciones_x)
+            opciones_color = ["ninguno"] + cols_cat
             color_sel = st.selectbox("Color por (opcional)", opciones_color)
-            color_col = None if color_sel == "—" else color_sel
+            color_col = None if color_sel == "ninguno" else color_sel
             common = dict(color_discrete_sequence=PALETTE, template="plotly_dark")
             if chart_type == "Barras":
                 fig = px.bar(df, x=col_x, y=col_y, color=color_col, **common)
-            elif chart_type == "Línea":
+            elif chart_type == "Linea":
                 fig = px.line(df, x=col_x, y=col_y, color=color_col, **common)
-            elif chart_type == "Dispersión":
+            elif chart_type == "Dispersion":
                 fig = px.scatter(df, x=col_x, y=col_y, color=color_col, **common)
             elif chart_type == "Histograma":
                 fig = px.histogram(df, x=col_y, color=color_col, **common)
@@ -130,10 +90,10 @@ def show():
 
     with tab3:
         if not st.session_state.get("api_key"):
-            st.warning("⚠️ Configura tu API Key de Anthropic primero.")
+            st.warning("Configura tu API Key de Anthropic primero.")
             return
-        st.markdown("### 🤖 Análisis automático con Claude")
-        if st.button("🔍 Generar análisis completo", type="primary"):
+        st.markdown("### Analisis automatico con Claude")
+        if st.button("Generar analisis completo", type="primary"):
             stats_json = df.describe(include="all").to_json()
             sample = df.head(20).to_csv(index=False)
             prompt = f"""Analiza este conjunto de datos de una empresa colombiana y entrega:
@@ -145,10 +105,10 @@ def show():
 Muestra de datos (CSV):
 {sample}
 
-Estadísticas descriptivas (JSON):
+Estadisticas descriptivas (JSON):
 {stats_json}
 """
-            with st.spinner("Claude está analizando tus datos…"):
+            with st.spinner("Claude esta analizando tus datos..."):
                 try:
                     respuesta = call_claude(prompt)
                     st.session_state["ai_analysis"] = respuesta
@@ -159,12 +119,12 @@ Estadísticas descriptivas (JSON):
             st.markdown(st.session_state["ai_analysis"])
 
         st.divider()
-        st.markdown("### 💬 Pregunta específica")
-        pregunta = st.text_input("¿Qué quieres saber sobre tus datos?", placeholder="Ej: ¿Cuáles son los productos con mayor margen?")
+        st.markdown("### Pregunta especifica")
+        pregunta = st.text_input("Que quieres saber sobre tus datos?", placeholder="Ej: Cuales son los productos con mayor margen?")
         if st.button("Preguntar") and pregunta:
             sample = df.head(50).to_csv(index=False)
             prompt = f"Datos:\n{sample}\n\nPregunta: {pregunta}"
-            with st.spinner("Analizando…"):
+            with st.spinner("Analizando..."):
                 try:
                     st.markdown(call_claude(prompt))
                 except Exception as e:
@@ -180,4 +140,4 @@ Estadísticas descriptivas (JSON):
         if not nulls.empty:
             st.dataframe(nulls.rename("Nulos"), use_container_width=True)
         else:
-            st.success("✅ No hay valores nulos en el dataset.")
+            st.success("No hay valores nulos en el dataset.")
