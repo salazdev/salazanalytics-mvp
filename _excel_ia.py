@@ -71,30 +71,36 @@ def show():
             opciones_color = ["ninguno"] + cols_cat
             color_sel = st.selectbox("Color por (opcional)", opciones_color)
             color_col = None if color_sel == "ninguno" else color_sel
-            common = dict(color_discrete_sequence=PALETTE, template="plotly_dark")
+            common = dict(template="plotly_dark")
             if chart_type == "Barras":
-                fig = px.bar(df, x=col_x, y=col_y, color=color_col, **common)
+                fig = px.bar(df, x=col_x, y=col_y, color=color_col,
+                 color_discrete_sequence=PALETTE, **common)
             elif chart_type == "Linea":
-                fig = px.line(df, x=col_x, y=col_y, color=color_col, **common)
+                fig = px.line(df, x=col_x, y=col_y, color=color_col,
+                  color_discrete_sequence=PALETTE, **common)
             elif chart_type == "Dispersion":
-                fig = px.scatter(df, x=col_x, y=col_y, color=color_col, **common)
+                fig = px.scatter(df, x=col_x, y=col_y, color=color_col,
+                     color_discrete_sequence=PALETTE, **common)
             elif chart_type == "Histograma":
-                fig = px.histogram(df, x=col_y, color=color_col, **common)
+                fig = px.histogram(df, x=col_y, color=color_col,
+                       color_discrete_sequence=PALETTE, **common)
             elif chart_type == "Pastel":
-                fig = px.pie(df, names=col_x, values=col_y, **common)
+                fig = px.pie(df, names=col_x, values=col_y,
+                 color_discrete_sequence=PALETTE, **common)
             else:
                 corr = df[cols_num].corr()
-                fig = px.imshow(corr, text_auto=True, color_continuous_scale="Blues", template="plotly_dark")
+                fig = px.imshow(corr, text_auto=True,
+                                color_continuous_scale="Blues", template="plotly_dark")
+
             fig.update_layout(
-                paper_bgcolor="#0D1B2A", 
-                plot_bgcolor="#132030", 
-                font_color="#E8F4FD", 
+                paper_bgcolor="#0D1B2A",
+                plot_bgcolor="#132030",
+                font_color="#E8F4FD",
                 margin=dict(t=30, b=30),
                 bargap=0.2
             )
             if color_col is None:
                 fig.update_traces(marker_color="#00C2FF")
-                st.plotly_chart(fig, use_container_width=True)
 
     with tab3:
         if not st.session_state.get("api_key"):
