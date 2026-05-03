@@ -4,7 +4,7 @@ from pathlib import Path
 import importlib.util
 import sys
 import base64
-import urllib.parse
+
 
 LOGO_SVG = b'''<svg xmlns="http://www.w3.org/2000/svg" width="260" height="70" viewBox="0 0 260 70">
   <line x1="10" y1="35" x2="25" y2="35" stroke="#1a3a5c" stroke-width="1.5"/>
@@ -94,7 +94,7 @@ def pantalla_login():
                 st.session_state["usuario"] = usuario
                 st.session_state["rol"] = ROLES.get(usuario, "Cliente")
                 st.rerun()
-                st.query_params["auth"] = "1"
+                
             else:
                 st.error("Usuario o contrasena incorrectos.")
         st.markdown("""
@@ -107,12 +107,7 @@ def pantalla_login():
         </div>
         """, unsafe_allow_html=True)
 
-def app_principal():
-  if "logged_in" not in st.session_state:
-    if st.query_params.get("auth") == "1":
-        st.session_state["logged_in"] = True
-        st.session_state["usuario"] = "admin"
-        st.session_state["rol"] = "Administrador"
+def app_principal():  
     base = Path(__file__).parent
 
     with st.sidebar:
