@@ -156,8 +156,7 @@ def app_principal():
             "<p style='color:#7B9BB5;font-size:.75rem;text-align:center'>salazanalytics.com</p>",
             unsafe_allow_html=True)
 
-    page = st.session_state.get("pagina_actual", "🏠 Inicio")
-
+    
     if   "Inicio"       in page: load_module("home", base/"_home.py").show()
     elif "PDF"          in page:
       st.write(f"Buscando: {base / '_pdf_ia.py'}")
