@@ -18,3 +18,7 @@ gatherUsageStats = false
 
 [ui]
 hideSidebarNav = true
+[server]
+maxUploadSize = 200
+enableXsrfProtection = false
+enableCORS = false
