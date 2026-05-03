@@ -124,17 +124,22 @@ def app_principal():
 
         st.divider()
 
-        opciones = [
-            "🏠 Inicio",
-            "📄 PDF con IA",
-            "🔮 Mirofish Predictor",
-            "📊 Dashboards Financieros",
-            "📗 Auditoria de Excel",
-            "💬 Consultor Contable IA",
-            "⚙️ Automatizacion n8n",
-            "🔍 Anomalias",
-            "📑 Exportar",
-        ]
+        page = st.radio(
+          "Menu",
+          [
+              "🏠 Inicio",
+              "⚖️ Revisoria y Cumplimiento",
+              "🔮 Mirofish Predictor",
+              "📊 Dashboards Financieros",
+              "📗 Auditoria de Excel",
+              "💬 Consultor Contable IA",
+              "⚙️ Automatizacion n8n",
+              "🔍 Anomalias",
+              "📑 Exportar",
+          ],
+          label_visibility="collapsed",
+          key="pagina_actual"
+      )
 
         if "pagina_actual" not in st.session_state:
             st.session_state["pagina_actual"] = "🏠 Inicio"
