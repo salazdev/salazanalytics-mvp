@@ -144,11 +144,7 @@ def app_principal():
         if "pagina_actual" not in st.session_state:
             st.session_state["pagina_actual"] = "🏠 Inicio"
 
-        for opcion in opciones:
-            if st.button(opcion, use_container_width=True, key=f"nav_{opcion}"):
-                st.session_state["pagina_actual"] = opcion
-                st.rerun()
-
+        
         st.divider()
 
         if st.button("Cerrar sesion", use_container_width=True):
