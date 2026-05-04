@@ -54,4 +54,6 @@ def show():
     with c2:
         if len(cols_num) >= 2:
             y2 = st.selectbox("Segunda métrica", cols_num, key="d_y2", index=min(1, len(cols_num)-1))
-            fig2 = px.scatter(df, x=cols_num[0], y=y2, color=cols_cat[0] if cols_cat else
+            fig2 = px.scatter(df, x=cols_num[0], y=y2, color=cols_cat[0] if cols_cat else None,
+                  color_discrete_sequence=PALETTE, template="plotly_dark",
+                  title=f"Dispersion: {cols_num[0]} vs {y2}")
