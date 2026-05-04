@@ -40,14 +40,21 @@ def show():
     c1, c2 = st.columns(2)
 
     with c1:
-        y1 = st.selectbox("Métrica principal", cols_num, key="d_y1")
+        y1 = st.selectbox("Metrica principal", cols_num, key="d_y1")
         if cols_cat:
-            x1 = st.selectbox("Categoría", cols_cat, key="d_x1")
-            fig1 = px.bar(df.groupby(x1)[y1].sum().reset_index(), x=x1, y=y1,
-                          color_discrete_sequence=PALETTE, template="plotly_dark",
-                          title=f"{y1} por {x1}")
+            x1 = st.selectbox("Categoria", cols_cat, key="d_x1")
+            try:
+                df_plot = df.copy()
+                df_plot[x1] = df_plot[x1].astype(str)
+                fig1 = px.bar(df_plot.groupby(x1)[y1].sum().reset_index(), x=x1, y=y1,
+                              color_discrete_sequence=PALETTE, template="plotly_dark",
+                              title=f"{y1} por {x1}")
+            except Exception as e:
+                fig1 = px.histogram(df, x=y1, color_discrete_sequence=PALETTE,
+                               template="plotly_dark")
         else:
-            fig1 = px.histogram(df, x=y1, color_discrete_sequence=PALETTE, template="plotly_dark")
+            fig1 = px.histogram(df, x=y1, color_discrete_sequence=PALETTE,
+                               template="plotly_dark")
         fig1.update_layout(paper_bgcolor="#0D1B2A", plot_bgcolor="#0D1B2A", font_color="#E8F4FD")
         st.plotly_chart(fig1, use_container_width=True)
 
