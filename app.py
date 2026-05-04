@@ -160,13 +160,7 @@ def app_principal():
 
     
     if   "Inicio"       in page: load_module("home", base/"_home.py").show()
-    elif "Revisor" in page:
-        try:
-            load_module("pdf_ia", base/"_pdf_ia.py").show()
-        except Exception as e:
-            st.error(f"Error: {e}")
-            import traceback
-            st.code(traceback.format_exc())
+    elif "Revisor" in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
     elif "PDF"          in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
     elif "Mirofish"     in page: load_module("ml_prediccion", base/"_ml_prediccion.py").show()
     elif "Dashboards"   in page: load_module("dashboards", base/"_dashboards.py").show()
