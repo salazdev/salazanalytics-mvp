@@ -95,4 +95,4 @@ def generar_pdf_factura(factura):
             ('ALIGN', (0,0), (0,-1), 'LEFT'),
             ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
             ('FONTSIZE', (0,1), (-1,-1), 9),
-            ('ROWBACKGROUNDS', (0,1), (-1,-1), [COLOR_LIGHT, color
+            ('ROWBACKGROUNDS', (0,1), (-1,-1), [COLOR_LIGHT, colors.white]),
