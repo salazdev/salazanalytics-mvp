@@ -138,6 +138,7 @@ def app_principal():
               "⚙️ Automatizacion n8n",
               "🔍 Anomalias",
               "📑 Exportar",
+              "🧾 Facturacion",
           ],
           label_visibility="collapsed",
           key="pagina_actual"
