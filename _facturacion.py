@@ -70,7 +70,7 @@ def generar_pdf_factura(factura):
         for key, prefix in [('cliente_nit','NIT/CC: '), ('cliente_email','Email: ')]:
             if factura.get(key):
                 info_data.append([Paragraph(f"{prefix}{factura[key]}", style_value),
-                                  Paragraph("",""), Paragraph("",""), Paragraph("","")])
+                                  "", "", ""])
 
         info_table = Table(info_data, colWidths=[2.5*inch, 0.5*inch, 1.8*inch, 1.7*inch])
         info_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP')]))
