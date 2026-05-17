@@ -169,6 +169,7 @@ def app_principal():
     elif "Consultor"    in page: load_module("chat_datos", base/"_chat_datos.py").show()
     elif "Anomalias"    in page: load_module("anomalias", base/"_anomalias.py").show()
     elif "Exportar"     in page: load_module("exportar", base/"_exportar.py").show()
+    elif "Facturacion" in page: load_module("facturacion", base/"_facturacion.py").show()  
 
 if not st.session_state.get("logged_in"):
     pantalla_login()
