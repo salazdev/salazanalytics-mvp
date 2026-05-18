@@ -5,6 +5,8 @@ import base64
 import io
 import json
 
+INSTRUCCIONES_IMPORTAR = """**Columnas requeridas:**\n\n- **Fecha** — formato DD/MM/AAAA (ej: 15/01/2026)\n- **Tipo** — exactamente: Ingreso o Gasto\n- **Categoria** — ver hoja Categorias en la plantilla\n- **Descripcion** — texto libre describiendo el movimiento\n- **Valor Base** — numero entero sin IVA (ej: 3500000)\n- **IVA %** — solo 0, 5 o 19\n\nLas filas 2-4 son ejemplos, puedes borrarlas. Puedes importar hasta 200 movimientos por archivo."""
+
 # ─────────────────────────────────────────────
 # CONSTANTES
 # ─────────────────────────────────────────────
@@ -268,6 +270,284 @@ Si no se menciona IVA, usa 0."""
 
 
 # ─────────────────────────────────────────────
+# PLANTILLA Y IMPORTADOR EXCEL
+# ─────────────────────────────────────────────
+
+CATEGORIAS_TODAS = [
+    "Ventas de productos", "Prestación de servicios", "Honorarios",
+    "Arrendamientos", "Intereses y rendimientos", "Otros ingresos",
+    "Nómina y salarios", "Arriendo", "Servicios públicos",
+    "Internet y telecomunicaciones", "Publicidad y marketing",
+    "Contabilidad y revisoría", "Software y suscripciones",
+    "Transporte y logística", "Compra de mercancía", "Equipos y herramientas",
+    "Gastos bancarios", "Impuestos y tasas", "Capacitación", "Otros gastos",
+]
+
+def _generar_plantilla_excel() -> bytes:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.data_validation import DataValidation
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Movimientos"
+
+    COLOR_DARK  = "0D1B2A"
+    COLOR_CYAN  = "00C2FF"
+    COLOR_GRAY  = "7B9BB5"
+    COLOR_LIGHT = "E8F4FD"
+    COLOR_GREEN = "E8F5E9"
+    COLOR_RED   = "FFEBEE"
+
+    # ── Encabezados ──
+    headers = [
+        ("fecha",       "Fecha (DD/MM/AAAA)", 16),
+        ("tipo",        "Tipo (Ingreso/Gasto)", 18),
+        ("categoria",   "Categoría", 30),
+        ("descripcion", "Descripción", 40),
+        ("valor",       "Valor Base (sin IVA)", 16),
+        ("iva",         "IVA % (0-5-19)", 14),
+    ]
+
+    for col, (_, label, width) in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=label)
+        cell.font      = Font(bold=True, color=COLOR_CYAN, name="Arial", size=10)
+        cell.fill      = PatternFill("solid", start_color=COLOR_DARK)
+        cell.alignment = Alignment(horizontal="center", vertical="center",
+                                   wrap_text=True)
+        ws.column_dimensions[get_column_letter(col)].width = width
+
+    ws.row_dimensions[1].height = 36
+
+    # ── Ejemplos (filas 2-4) ──
+    ejemplos = [
+        ("15/01/2026", "Ingreso", "Honorarios",         "Consultoría financiera enero - Cliente ABC",  3500000, 19),
+        ("20/01/2026", "Gasto",   "Nómina y salarios",  "Nómina enero empleados",                    12250905,  0),
+        ("31/01/2026", "Gasto",   "Arriendo",           "Arriendo oficina enero",                     1800000,  0),
+    ]
+    for row, datos in enumerate(ejemplos, 2):
+        for col, val in enumerate(datos, 1):
+            cell = ws.cell(row=row, column=col, value=val)
+            cell.font = Font(name="Arial", size=9, italic=True, color="888888")
+            cell.fill = PatternFill("solid", start_color="F5F5F5")
+            cell.alignment = Alignment(horizontal="center" if col in [1,2,5,6] else "left")
+
+    # ── Filas vacías para datos (5 a 204) ──
+    thin = Side(style="thin", color="CCCCCC")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    for row in range(5, 205):
+        for col in range(1, 7):
+            cell = ws.cell(row=row, column=col)
+            cell.font      = Font(name="Arial", size=9)
+            cell.border    = border
+            cell.alignment = Alignment(horizontal="center" if col in [1,2,5,6] else "left",
+                                       vertical="center")
+            # Colorear fondo por tipo (col 2)
+            if col == 2:
+                cell.fill = PatternFill("solid", start_color="FAFAFA")
+
+    # ── Validación: Tipo ──
+    dv_tipo = DataValidation(type="list", formula1='"Ingreso,Gasto"',
+                              allow_blank=False, showDropDown=False)
+    dv_tipo.error      = "Escribe Ingreso o Gasto"
+    dv_tipo.errorTitle = "Valor inválido"
+    ws.add_data_validation(dv_tipo)
+    dv_tipo.add(f"B5:B204")
+
+    # ── Validación: IVA ──
+    dv_iva = DataValidation(type="list", formula1='"0,5,19"',
+                             allow_blank=False, showDropDown=False)
+    dv_iva.error      = "Solo se permite 0, 5 o 19"
+    dv_iva.errorTitle = "IVA inválido"
+    ws.add_data_validation(dv_iva)
+    dv_iva.add("F5:F204")
+
+    # ── Validación: Valor positivo ──
+    dv_valor = DataValidation(type="whole", operator="greaterThan",
+                               formula1="0", allow_blank=True)
+    dv_valor.error      = "El valor debe ser mayor a 0"
+    dv_valor.errorTitle = "Valor inválido"
+    ws.add_data_validation(dv_valor)
+    dv_valor.add("E5:E204")
+
+    # ── Hoja de instrucciones ──
+    ws2 = wb.create_sheet("Instrucciones")
+    instrucciones = [
+        ("INSTRUCCIONES DE USO", None, True, "0D1B2A", "00C2FF"),
+        ("", None, False, None, None),
+        ("1. FECHA", "Formato DD/MM/AAAA. Ej: 15/01/2026", False, None, None),
+        ("2. TIPO", "Escribe exactamente: Ingreso o Gasto (con mayúscula)", False, None, None),
+        ("3. CATEGORÍA", "Copia una de las categorías de la hoja 'Categorías'", False, None, None),
+        ("4. DESCRIPCIÓN", "Describe brevemente el movimiento (máx 100 caracteres)", False, None, None),
+        ("5. VALOR BASE", "El valor SIN IVA en pesos colombianos. Solo números enteros.", False, None, None),
+        ("6. IVA %", "Escribe 0, 5 o 19. Si no aplica IVA escribe 0.", False, None, None),
+        ("", None, False, None, None),
+        ("IMPORTANTE", "No modifiques los encabezados de la fila 1.", False, None, None),
+        ("", "Las filas 2, 3 y 4 son ejemplos — puedes borrarlos.", False, None, None),
+        ("", "Puedes agregar hasta 200 movimientos por importación.", False, None, None),
+        ("", "El sistema calculará automáticamente el IVA y el total.", False, None, None),
+    ]
+    for row, (label, valor, bold, bg, fg) in enumerate(instrucciones, 1):
+        c1 = ws2.cell(row=row, column=1, value=label)
+        c2 = ws2.cell(row=row, column=2, value=valor)
+        if bold:
+            c1.font = Font(bold=True, name="Arial", size=12,
+                           color=fg or "000000")
+            c1.fill = PatternFill("solid", start_color=bg or "FFFFFF")
+        else:
+            c1.font = Font(bold=bool(label), name="Arial", size=10)
+            c2.font = Font(name="Arial", size=10)
+    ws2.column_dimensions["A"].width = 20
+    ws2.column_dimensions["B"].width = 60
+
+    # ── Hoja de categorías válidas ──
+    ws3 = wb.create_sheet("Categorías")
+    ws3.cell(1, 1, "INGRESOS").font = Font(bold=True, color="00C2FF", name="Arial")
+    ws3.cell(1, 2, "GASTOS").font   = Font(bold=True, color="E53935", name="Arial")
+    ingresos = [c for c in CATEGORIAS_TODAS if c in [
+        "Ventas de productos","Prestación de servicios","Honorarios",
+        "Arrendamientos","Intereses y rendimientos","Otros ingresos"]]
+    gastos   = [c for c in CATEGORIAS_TODAS if c not in ingresos]
+    for i, cat in enumerate(ingresos, 2):
+        ws3.cell(i, 1, cat).font = Font(name="Arial", size=9)
+    for i, cat in enumerate(gastos, 2):
+        ws3.cell(i, 2, cat).font = Font(name="Arial", size=9)
+    ws3.column_dimensions["A"].width = 35
+    ws3.column_dimensions["B"].width = 35
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def _importar_desde_excel(archivo, nit_empresa: str) -> tuple[int, list[str]]:
+    """
+    Lee el Excel del cliente y guarda los movimientos en SQLite.
+    Retorna (cantidad_importados, lista_de_errores)
+    """
+    from datetime import datetime
+
+    try:
+        df = pd.read_excel(archivo, sheet_name="Movimientos", header=0, skiprows=0)
+    except Exception as e:
+        return 0, [f"No se pudo leer el archivo: {e}"]
+
+    # Normalizar nombres de columnas
+    df.columns = [str(c).strip().lower().split("\n")[0].split("(")[0].strip()
+                  for c in df.columns]
+
+    # Mapeo flexible de columnas
+    col_map = {
+        "fecha":       ["fecha"],
+        "tipo":        ["tipo"],
+        "categoria":   ["categoría", "categoria"],
+        "descripcion": ["descripción", "descripcion"],
+        "valor":       ["valor base", "valor"],
+        "iva":         ["iva %", "iva"],
+    }
+    rename = {}
+    for target, posibles in col_map.items():
+        for p in posibles:
+            if p in df.columns:
+                rename[p] = target
+                break
+
+    df = df.rename(columns=rename)
+
+    # Validar columnas requeridas
+    requeridas = ["fecha", "tipo", "categoria", "descripcion", "valor", "iva"]
+    faltantes = [r for r in requeridas if r not in df.columns]
+    if faltantes:
+        return 0, [f"Columnas faltantes: {', '.join(faltantes)}. "
+                   f"Descarga la plantilla oficial y úsala."]
+
+    # Filtrar filas vacías y ejemplos (filas 2-4 del Excel = índices 0-2)
+    df = df.dropna(subset=["fecha", "tipo", "valor"])
+    df = df[df["tipo"].astype(str).str.strip().isin(["Ingreso", "Gasto"])]
+
+    if df.empty:
+        return 0, ["El archivo no tiene movimientos válidos. "
+                   "Asegúrate de que la columna Tipo diga 'Ingreso' o 'Gasto'."]
+
+    db = _db_mod()
+    importados = 0
+    errores    = []
+
+    for idx, row in df.iterrows():
+        fila = idx + 2  # número de fila en Excel (1-indexed + encabezado)
+        try:
+            # Fecha
+            fecha_raw = row["fecha"]
+            if pd.isna(fecha_raw):
+                errores.append(f"Fila {fila}: fecha vacía — omitida.")
+                continue
+            if isinstance(fecha_raw, str):
+                for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y"]:
+                    try:
+                        fecha = datetime.strptime(fecha_raw.strip(), fmt).date()
+                        break
+                    except:
+                        fecha = None
+                if not fecha:
+                    errores.append(f"Fila {fila}: fecha '{fecha_raw}' inválida — usa DD/MM/AAAA.")
+                    continue
+            else:
+                try:
+                    fecha = pd.to_datetime(fecha_raw).date()
+                except:
+                    errores.append(f"Fila {fila}: fecha inválida — omitida.")
+                    continue
+
+            # Tipo
+            tipo = str(row["tipo"]).strip()
+            if tipo not in ["Ingreso", "Gasto"]:
+                errores.append(f"Fila {fila}: tipo '{tipo}' inválido — debe ser Ingreso o Gasto.")
+                continue
+
+            # Categoría
+            categoria = str(row.get("categoria", "Otros gastos" if tipo == "Gasto" else "Otros ingresos")).strip()
+            if categoria not in CATEGORIAS_TODAS:
+                categoria = "Otros gastos" if tipo == "Gasto" else "Otros ingresos"
+
+            # Descripción
+            descripcion = str(row.get("descripcion", "Sin descripción")).strip()[:200]
+            if not descripcion or descripcion == "nan":
+                descripcion = "Sin descripción"
+
+            # Valor
+            try:
+                valor = float(str(row["valor"]).replace(",", "").replace("$", "").strip())
+                if valor <= 0:
+                    errores.append(f"Fila {fila}: valor {valor} no es válido — debe ser > 0.")
+                    continue
+            except:
+                errores.append(f"Fila {fila}: valor '{row['valor']}' no es un número.")
+                continue
+
+            # IVA
+            try:
+                iva = int(float(str(row.get("iva", 0)).replace("%", "").strip()))
+                if iva not in [0, 5, 19]:
+                    iva = 0
+            except:
+                iva = 0
+
+            valor_iva = round(valor * iva / 100)
+            total     = round(valor + valor_iva)
+
+            db.movimiento_crear(nit_empresa, str(fecha), tipo, categoria,
+                                descripcion, valor, iva, valor_iva, total)
+            importados += 1
+
+        except Exception as e:
+            errores.append(f"Fila {fila}: error inesperado — {e}")
+
+    return importados, errores
+
+
+# ─────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────
 
@@ -281,8 +561,8 @@ def show():
         unsafe_allow_html=True
     )
 
-    tab_agente, tab_manual, tab_dashboard, tab_iva, tab_oblig = st.tabs([
-        "🤖 Registrar con IA", "✏️ Registro Manual", "📊 Dashboard", "🧾 IVA y SIMPLE", "⚖️ Obligaciones"
+    tab_agente, tab_manual, tab_dashboard, tab_iva, tab_oblig, tab_importar = st.tabs([
+        "🤖 Registrar con IA", "✏️ Registro Manual", "📊 Dashboard", "🧾 IVA y SIMPLE", "⚖️ Obligaciones", "📥 Importar Excel"
     ])
 
     # ══════════════════════════════════════════
@@ -1095,3 +1375,218 @@ def show():
                 "consulta con tu contador al menos 2 semanas antes de cada vencimiento. "
                 "Las sanciones por extemporaneidad en Colombia pueden ser del 5% al 200% del impuesto."
             )
+
+    # ══════════════════════════════════════════
+    # TAB IMPORTAR EXCEL
+    # ══════════════════════════════════════════
+    with tab_importar:
+        st.markdown("### 📥 Importar movimientos desde Excel")
+        st.markdown(
+            "<p style='color:#7B9BB5'>Carga todos tus movimientos de una vez "
+            "usando la plantilla oficial de SalazAnalytics.</p>",
+            unsafe_allow_html=True
+        )
+
+        # ── Paso 1: Descargar plantilla ──
+        st.markdown("#### Paso 1 — Descarga la plantilla")
+        st.markdown(
+            "La plantilla tiene el formato exacto que necesita el sistema. "
+            "Incluye instrucciones y las categorías válidas.",
+            unsafe_allow_html=False
+        )
+
+        plantilla_bytes = _generar_plantilla_excel()
+        b64_plantilla = base64.b64encode(plantilla_bytes).decode()
+        href_plantilla = (
+            f'<a href="data:application/vnd.openxmlformats-officedocument.'
+            f'spreadsheetml.sheet;base64,{b64_plantilla}" '
+            f'download="plantilla_movimientos_salazanalytics.xlsx" '
+            f'style="display:inline-block;background:#00C2FF;color:#0D1B2A;'
+            f'font-weight:700;padding:.7rem 1.5rem;border-radius:8px;'
+            f'text-decoration:none;font-size:1rem;">'
+            f'⬇️ Descargar Plantilla Excel</a>'
+        )
+        st.markdown(href_plantilla, unsafe_allow_html=True)
+
+        st.divider()
+
+        # ── Paso 2: Instrucciones rápidas ──
+        st.markdown("#### Paso 2 — Llena la plantilla")
+        with st.expander("Ver instrucciones de llenado"):
+            st.markdown("""
+**Columnas requeridas:**
+
+| Columna | Formato | Ejemplo |
+|---------|---------|---------|
+| Fecha | DD/MM/AAAA | 15/01/2026 |
+| Tipo | Ingreso o Gasto | Ingreso |
+| Categoría | Ver hoja "Categorías" | Honorarios |
+| Descripción | Texto libre | Consultoría enero |
+| Valor Base | Número entero sin IVA | 3500000 |
+| IVA % | 0, 5 o 19 | 19 |
+
+**Consejos:**
+- Las filas 2, 3 y 4 son ejemplos — puedes borrarlas o sobreescribirlas
+- El valor debe ser la base sin IVA (el sistema calcula el IVA automáticamente)
+- Si un movimiento no tiene IVA, escribe 0 en la columna IVA %
+- Puedes importar hasta 200 movimientos por archivo
+- Los duplicados no se detectan automáticamente — revisa antes de importar
+            """)
+
+        st.divider()
+
+        # ── Paso 3: Subir y procesar ──
+        st.markdown("#### Paso 3 — Sube el archivo lleno")
+
+        archivo = st.file_uploader(
+            "Selecciona el archivo Excel con tus movimientos",
+            type=["xlsx", "xls"],
+            key="importar_excel_file"
+        )
+
+        if archivo is not None:
+            st.info(f"Archivo cargado: **{archivo.name}** "
+                    f"({archivo.size / 1024:.1f} KB)")
+
+            # Vista previa
+            try:
+                df_preview = pd.read_excel(archivo, sheet_name="Movimientos",
+                                           header=0, nrows=8)
+                st.markdown("**Vista previa (primeras filas):**")
+                st.dataframe(df_preview, use_container_width=True)
+                archivo.seek(0)
+            except Exception as e:
+                st.warning(f"No se pudo previsualizar: {e}")
+
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                confirmar = st.button("🚀 Importar movimientos",
+                                      type="primary",
+                                      key="btn_confirmar_importar")
+            with col2:
+                st.markdown(
+                    "<p style='color:#7B9BB5;padding-top:.6rem'>"
+                    "Los movimientos se agregarán a tu contabilidad actual.</p>",
+                    unsafe_allow_html=True
+                )
+
+            if confirmar:
+                with st.spinner("Procesando archivo..."):
+                    archivo.seek(0)
+                    importados, errores = _importar_desde_excel(
+                        archivo, _nit()
+                    )
+
+                if importados > 0:
+                    st.success(
+                        f"✅ Se importaron **{importados} movimientos** "
+                        f"exitosamente a tu contabilidad."
+                    )
+
+                if errores:
+                    st.warning(f"Se encontraron {len(errores)} advertencias:")
+                    with st.expander("Ver detalle de errores"):
+                        for err in errores:
+                            st.markdown(f"- {err}")
+
+                if importados == 0 and not errores:
+                    st.error("No se importó ningún movimiento. "
+                             "Verifica que el archivo tenga datos válidos.")
+
+        # ── Tip final ──
+        st.divider()
+        st.markdown(
+            "<div style='background:#132030;border:1px solid #1a3a5c;"
+            "border-radius:8px;padding:1rem;'>"
+            "<p style='color:#00C2FF;font-weight:600;margin:0 0 .5rem'>💡 Tip para tus clientes</p>"
+            "<p style='color:#7B9BB5;margin:0;font-size:.88rem'>"
+            "Pídele al cliente que exporte su contabilidad actual a Excel "
+            "(desde cualquier sistema — Siigo, Alegra, Helisa, o incluso un Excel manual) "
+            "y que mapee las columnas a esta plantilla. "
+            "Con esto puedes onboardear un cliente nuevo en menos de 10 minutos.</p>"
+            "</div>",
+            unsafe_allow_html=True
+        )
+
+    with tab_importar:
+        st.markdown("### Importar movimientos desde Excel")
+        st.markdown(
+            "<p style='color:#7B9BB5'>Carga todos tus movimientos de una vez "
+            "usando la plantilla oficial de SalazAnalytics.</p>",
+            unsafe_allow_html=True
+        )
+
+        st.markdown("#### Paso 1 — Descarga la plantilla")
+        plantilla_bytes = _generar_plantilla_excel()
+        b64p = base64.b64encode(plantilla_bytes).decode()
+        enlace = (
+            '<a href="data:application/vnd.openxmlformats-officedocument.'
+            'spreadsheetml.sheet;base64,' + b64p + '" '
+            'download="plantilla_movimientos_salazanalytics.xlsx" '
+            'style="display:inline-block;background:#00C2FF;color:#0D1B2A;'
+            'font-weight:700;padding:.7rem 1.5rem;border-radius:8px;'
+            'text-decoration:none;">Descargar Plantilla Excel</a>'
+        )
+        st.markdown(enlace, unsafe_allow_html=True)
+
+        st.divider()
+        st.markdown("#### Paso 2 — Llena la plantilla")
+        with st.expander("Ver instrucciones"):
+            st.markdown(INSTRUCCIONES_IMPORTAR)
+
+        st.divider()
+        st.markdown("#### Paso 3 — Sube el archivo lleno")
+
+        archivo = st.file_uploader(
+            "Selecciona el archivo Excel con tus movimientos",
+            type=["xlsx","xls"],
+            key="importar_excel_file"
+        )
+
+        if archivo is not None:
+            kb = round(archivo.size / 1024, 1)
+            st.info(f"Archivo cargado: {archivo.name} — {kb} KB")
+            try:
+                df_prev = pd.read_excel(archivo, sheet_name="Movimientos", header=0, nrows=6)
+                st.markdown("**Vista previa:**")
+                st.dataframe(df_prev, use_container_width=True)
+                archivo.seek(0)
+            except Exception as ex:
+                st.warning(f"No se pudo previsualizar: {ex}")
+
+            c1, c2 = st.columns([1, 3])
+            with c1:
+                confirmar = st.button("Importar movimientos", type="primary", key="btn_importar")
+            with c2:
+                st.markdown(
+                    "<p style='color:#7B9BB5;padding-top:.6rem'>"
+                    "Los movimientos se agregan a tu contabilidad actual.</p>",
+                    unsafe_allow_html=True
+                )
+
+            if confirmar:
+                with st.spinner("Procesando archivo..."):
+                    archivo.seek(0)
+                    importados, errores = _importar_desde_excel(archivo, _nit())
+                if importados > 0:
+                    st.success(f"Se importaron {importados} movimientos exitosamente.")
+                if errores:
+                    st.warning(f"Se encontraron {len(errores)} advertencias:")
+                    with st.expander("Ver detalle"):
+                        for err in errores:
+                            st.markdown(f"- {err}")
+                if importados == 0 and not errores:
+                    st.error("No se importo ningun movimiento. Verifica el archivo.")
+
+        st.divider()
+        st.markdown(
+            "<div style='background:#132030;border:1px solid #1a3a5c;"
+            "border-radius:8px;padding:1rem;'>"
+            "<p style='color:#00C2FF;font-weight:600;margin:0 0 .4rem'>Tip para tus clientes</p>"
+            "<p style='color:#7B9BB5;margin:0;font-size:.88rem'>"
+            "Pide al cliente que exporte su contabilidad a Excel "
+            "(Siigo, Alegra, Helisa o Excel manual) y mapee las columnas a esta plantilla. "
+            "Puedes incorporar un cliente nuevo en menos de 10 minutos.</p>"
+            "</div>",
+            unsafe_allow_html=True
+        )
