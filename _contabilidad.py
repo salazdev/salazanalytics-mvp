@@ -1386,105 +1386,6 @@ def show():
         )
         st.markdown(href_plantilla, unsafe_allow_html=True)
 
-        st.divider()
-
-        # ── Paso 2: Instrucciones rápidas ──
-        st.markdown("#### Paso 2 — Llena la plantilla")
-        with st.expander("Ver instrucciones de llenado"):
-            st.markdown("""
-**Columnas requeridas:**
-
-| Columna | Formato | Ejemplo |
-|---------|---------|---------|
-| Fecha | DD/MM/AAAA | 15/01/2026 |
-| Tipo | Ingreso o Gasto | Ingreso |
-| Categoría | Ver hoja "Categorías" | Honorarios |
-| Descripción | Texto libre | Consultoría enero |
-| Valor Base | Número entero sin IVA | 3500000 |
-| IVA % | 0, 5 o 19 | 19 |
-
-**Consejos:**
-- Las filas 2, 3 y 4 son ejemplos — puedes borrarlas o sobreescribirlas
-- El valor debe ser la base sin IVA (el sistema calcula el IVA automáticamente)
-- Si un movimiento no tiene IVA, escribe 0 en la columna IVA %
-- Puedes importar hasta 200 movimientos por archivo
-- Los duplicados no se detectan automáticamente — revisa antes de importar
-            """)
-
-        st.divider()
-
-        # ── Paso 3: Subir y procesar ──
-        st.markdown("#### Paso 3 — Sube el archivo lleno")
-
-        archivo = st.file_uploader(
-            "Selecciona el archivo Excel con tus movimientos",
-            type=["xlsx", "xls"],
-            key="importar_excel_file"
-        )
-
-        if archivo is not None:
-            st.info(f"Archivo cargado: **{archivo.name}** "
-                    f"({archivo.size / 1024:.1f} KB)")
-
-            # Vista previa
-            try:
-                df_preview = pd.read_excel(archivo, sheet_name="Movimientos",
-                                           header=0, nrows=8)
-                st.markdown("**Vista previa (primeras filas):**")
-                st.dataframe(df_preview, use_container_width=True)
-                archivo.seek(0)
-            except Exception as e:
-                st.warning(f"No se pudo previsualizar: {e}")
-
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                confirmar = st.button("🚀 Importar movimientos",
-                                      type="primary",
-                                      key="btn_confirmar_importar")
-            with col2:
-                st.markdown(
-                    "<p style='color:#7B9BB5;padding-top:.6rem'>"
-                    "Los movimientos se agregarán a tu contabilidad actual.</p>",
-                    unsafe_allow_html=True
-                )
-
-            if confirmar:
-                with st.spinner("Procesando archivo..."):
-                    archivo.seek(0)
-                    importados, errores = _importar_desde_excel(
-                        archivo, _nit()
-                    )
-
-                if importados > 0:
-                    st.success(
-                        f"✅ Se importaron **{importados} movimientos** "
-                        f"exitosamente a tu contabilidad."
-                    )
-
-                if errores:
-                    st.warning(f"Se encontraron {len(errores)} advertencias:")
-                    with st.expander("Ver detalle de errores"):
-                        for err in errores:
-                            st.markdown(f"- {err}")
-
-                if importados == 0 and not errores:
-                    st.error("No se importó ningún movimiento. "
-                             "Verifica que el archivo tenga datos válidos.")
-
-        # ── Tip final ──
-        st.divider()
-        st.markdown(
-            "<div style='background:#132030;border:1px solid #1a3a5c;"
-            "border-radius:8px;padding:1rem;'>"
-            "<p style='color:#00C2FF;font-weight:600;margin:0 0 .5rem'>💡 Tip para tus clientes</p>"
-            "<p style='color:#7B9BB5;margin:0;font-size:.88rem'>"
-            "Pídele al cliente que exporte su contabilidad actual a Excel "
-            "(desde cualquier sistema — Siigo, Alegra, Helisa, o incluso un Excel manual) "
-            "y que mapee las columnas a esta plantilla. "
-            "Con esto puedes onboardear un cliente nuevo en menos de 10 minutos.</p>"
-            "</div>",
-            unsafe_allow_html=True
-        )
 
     with tab_importar:
         st.markdown("### Importar movimientos desde Excel")
@@ -1499,9 +1400,9 @@ def show():
         b64p = base64.b64encode(plantilla_bytes).decode()
         enlace = (
             '<a href="data:application/vnd.openxmlformats-officedocument.'
-            'spreadsheetml.sheet;base64,' + b64p + '" '
-            'download="plantilla_movimientos_salazanalytics.xlsx" '
-            'style="display:inline-block;background:#00C2FF;color:#0D1B2A;'
+            'spreadsheetml.sheet;base64,' + b64p + '"'
+            ' download="plantilla_movimientos_salazanalytics.xlsx"'
+            ' style="display:inline-block;background:#00C2FF;color:#0D1B2A;'
             'font-weight:700;padding:.7rem 1.5rem;border-radius:8px;'
             'text-decoration:none;">Descargar Plantilla Excel</a>'
         )
@@ -1515,26 +1416,26 @@ def show():
         st.divider()
         st.markdown("#### Paso 3 — Sube el archivo lleno")
 
-        archivo = st.file_uploader(
+        archivo_imp = st.file_uploader(
             "Selecciona el archivo Excel con tus movimientos",
             type=["xlsx","xls"],
-            key="importar_excel_file"
+            key="imp_excel_v2"
         )
 
-        if archivo is not None:
-            kb = round(archivo.size / 1024, 1)
-            st.info(f"Archivo cargado: {archivo.name} — {kb} KB")
+        if archivo_imp is not None:
+            kb = round(archivo_imp.size / 1024, 1)
+            st.info(f"Archivo cargado: {archivo_imp.name} — {kb} KB")
             try:
-                df_prev = pd.read_excel(archivo, sheet_name="Movimientos", header=0, nrows=6)
+                df_prev = pd.read_excel(archivo_imp, sheet_name="Movimientos", header=0, nrows=6)
                 st.markdown("**Vista previa:**")
                 st.dataframe(df_prev, use_container_width=True)
-                archivo.seek(0)
+                archivo_imp.seek(0)
             except Exception as ex:
                 st.warning(f"No se pudo previsualizar: {ex}")
 
             c1, c2 = st.columns([1, 3])
             with c1:
-                confirmar = st.button("Importar movimientos", type="primary", key="btn_importar")
+                confirmar = st.button("Importar movimientos", type="primary", key="btn_imp_v2")
             with c2:
                 st.markdown(
                     "<p style='color:#7B9BB5;padding-top:.6rem'>"
@@ -1544,8 +1445,8 @@ def show():
 
             if confirmar:
                 with st.spinner("Procesando archivo..."):
-                    archivo.seek(0)
-                    importados, errores = _importar_desde_excel(archivo, _nit())
+                    archivo_imp.seek(0)
+                    importados, errores = _importar_desde_excel(archivo_imp, _nit())
                 if importados > 0:
                     st.success(f"Se importaron {importados} movimientos exitosamente.")
                 if errores:
