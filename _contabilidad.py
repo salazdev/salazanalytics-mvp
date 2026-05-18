@@ -52,16 +52,36 @@ TARIFAS_SIMPLE = {
 # ─────────────────────────────────────────────
 
 def _init():
-    if "movimientos" not in st.session_state:
-        st.session_state["movimientos"] = []  # lista de dicts
+    """Sin estado local — los datos viven en SQLite."""
+    pass
+
+def _nit() -> str:
+    return st.session_state.get("nit", "DEMO")
 
 def _movimientos() -> list:
-    return st.session_state.get("movimientos", [])
+    from pathlib import Path
+    import importlib.util, sys
+    base = Path(__file__).parent
+    spec = importlib.util.spec_from_file_location("db", base / "_db.py")
+    mod  = importlib.util.module_from_spec(spec)
+    sys.modules["db"] = mod
+    spec.loader.exec_module(mod)
+    return mod.movimientos_listar(_nit())
+
+def _db_mod():
+    from pathlib import Path
+    import importlib.util, sys
+    base = Path(__file__).parent
+    spec = importlib.util.spec_from_file_location("db", base / "_db.py")
+    mod  = importlib.util.module_from_spec(spec)
+    sys.modules["db"] = mod
+    spec.loader.exec_module(mod)
+    return mod
 
 def _df() -> pd.DataFrame:
     mvs = _movimientos()
     if not mvs:
-        return pd.DataFrame(columns=["fecha","tipo","categoria","descripcion","valor","iva","valor_iva","total"])
+        return pd.DataFrame(columns=["id","fecha","tipo","categoria","descripcion","valor","iva","valor_iva","total"])
     df = pd.DataFrame(mvs)
     df["fecha"] = pd.to_datetime(df["fecha"])
     df = df.sort_values("fecha", ascending=False).reset_index(drop=True)
@@ -261,8 +281,8 @@ def show():
         unsafe_allow_html=True
     )
 
-    tab_agente, tab_manual, tab_dashboard, tab_iva = st.tabs([
-        "🤖 Registrar con IA", "✏️ Registro Manual", "📊 Dashboard", "🧾 IVA y SIMPLE"
+    tab_agente, tab_manual, tab_dashboard, tab_iva, tab_oblig = st.tabs([
+        "🤖 Registrar con IA", "✏️ Registro Manual", "📊 Dashboard", "🧾 IVA y SIMPLE", "⚖️ Obligaciones"
     ])
 
     # ══════════════════════════════════════════
@@ -310,7 +330,10 @@ def show():
                             "valor_iva":   valor_iva,
                             "total":       total,
                         }
-                        st.session_state["movimientos"].append(mov)
+                        db = _db_mod()
+                        db.movimiento_crear(_nit(), mov["fecha"], mov["tipo"],
+                            mov["categoria"], mov["descripcion"], mov["valor"],
+                            mov["iva"], mov["valor_iva"], mov["total"])
                         tipo_color = "🟢" if r["tipo"] == "Ingreso" else "🔴"
                         st.success(
                             f"{tipo_color} {r['mensaje']}  \n"
@@ -355,16 +378,9 @@ def show():
             elif valor <= 0:
                 st.warning("El valor debe ser mayor a 0.")
             else:
-                st.session_state["movimientos"].append({
-                    "fecha":       str(fecha_mov),
-                    "tipo":        tipo,
-                    "categoria":   categoria,
-                    "descripcion": descripcion,
-                    "valor":       valor,
-                    "iva":         iva_pct,
-                    "valor_iva":   round(valor_iva),
-                    "total":       round(total_mov),
-                })
+                db = _db_mod()
+                db.movimiento_crear(_nit(), str(fecha_mov), tipo, categoria,
+                    descripcion, valor, iva_pct, round(valor_iva), round(total_mov))
                 st.success(f"✅ Movimiento guardado — ${total_mov:,.0f}")
 
         # ── Tabla de movimientos ──
@@ -411,8 +427,10 @@ def show():
             c1, c2 = st.columns([1, 3])
             with c1:
                 if st.button("🗑️ Eliminar último", key="btn_del_ultimo"):
-                    if st.session_state["movimientos"]:
-                        st.session_state["movimientos"].pop()
+                    mvs = _movimientos()
+                    if mvs:
+                        db = _db_mod()
+                        db.movimiento_eliminar(mvs[0]["id"], _nit())
                         st.rerun()
             with c2:
                 if st.button("📥 Exportar a Excel", key="btn_exportar", type="primary"):
@@ -587,7 +605,7 @@ def show():
                 )
 
                 ingresos_base = df_p[df_p["tipo"]=="Ingreso"]["valor"].sum()
-                ingresos_uvt  = ingresos_base / 47_065  # UVT 2024
+                ingresos_uvt  = ingresos_base / 52_374  # UVT 2024
 
                 # Determinar tarifa
                 if ingresos_uvt <= 6000:
@@ -635,3 +653,445 @@ def show():
                         f'text-decoration:none;">⬇️ Descargar Excel Completo</a>'
                     )
                     st.markdown(href, unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════
+    # TAB OBLIGACIONES TRIBUTARIAS
+    # ══════════════════════════════════════════
+    with tab_oblig:
+        st.markdown("### ⚖️ Obligaciones Tributarias")
+        st.markdown(
+            "<p style='color:#7B9BB5'>Retención en la fuente, ICA, renta, "
+            "prestaciones sociales y registros. Estimados para llevar a tu contador.</p>",
+            unsafe_allow_html=True
+        )
+
+        UVT = 52_374  # UVT 2026
+
+        sub_rete, sub_ica, sub_presta, sub_renta, sub_registros = st.tabs([
+            "✂️ Retención en la Fuente",
+            "🏙️ ICA Pereira",
+            "👥 Prestaciones Sociales",
+            "📋 Estimado Renta",
+            "📜 Registros y Licencias",
+        ])
+
+        # ── RETENCIÓN EN LA FUENTE ──
+        with sub_rete:
+            st.markdown("#### Retención en la Fuente")
+            st.markdown(
+                "<p style='color:#7B9BB5;font-size:.85rem'>"
+                "Calcula la retención que debes practicar al pagar a terceros.</p>",
+                unsafe_allow_html=True
+            )
+
+            TARIFAS_RETE = {
+                "Honorarios (profesionales)": {"tarifa": 11.0, "base_uvt": 0},
+                "Servicios en general":        {"tarifa": 4.0,  "base_uvt": 4},
+                "Servicios técnicos":          {"tarifa": 6.0,  "base_uvt": 4},
+                "Compras / mercancía":         {"tarifa": 2.5,  "base_uvt": 27},
+                "Arrendamientos (inmuebles)":  {"tarifa": 3.5,  "base_uvt": 0},
+                "Arrendamientos (muebles)":    {"tarifa": 4.0,  "base_uvt": 0},
+                "Transporte de carga":         {"tarifa": 1.0,  "base_uvt": 27},
+                "Transporte de pasajeros":     {"tarifa": 3.5,  "base_uvt": 27},
+            }
+
+            c1, c2 = st.columns(2)
+            with c1:
+                concepto_rete = st.selectbox("Concepto del pago", list(TARIFAS_RETE.keys()), key="rete_concepto")
+                valor_pago = st.number_input("Valor del pago ($)", min_value=0, step=100_000, key="rete_valor")
+            with c2:
+                declarante = st.radio("El beneficiario es", ["Declarante de renta", "No declarante"], key="rete_decl")
+                mes_rete = st.selectbox("Mes del pago", MESES, key="rete_mes", index=date.today().month - 1)
+
+            info = TARIFAS_RETE[concepto_rete]
+            base_minima = info["base_uvt"] * UVT
+            tarifa = info["tarifa"]
+            # No declarantes pagan doble en servicios/honorarios
+            if declarante == "No declarante" and concepto_rete in ["Honorarios (profesionales)", "Servicios en general", "Servicios técnicos"]:
+                tarifa = min(tarifa * 2, 33.0)
+
+            if valor_pago > 0 and valor_pago >= base_minima:
+                retencion = round(valor_pago * tarifa / 100)
+                neto_pagar = valor_pago - retencion
+            else:
+                retencion = 0
+                neto_pagar = valor_pago
+
+            st.divider()
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Valor bruto",    f"${valor_pago:,.0f}")
+            c2.metric(f"Tarifa ({tarifa}%)", f"${retencion:,.0f}")
+            c3.metric("Neto a pagar",   f"${neto_pagar:,.0f}")
+            c4.metric("Base mínima",    f"${base_minima:,.0f}")
+
+            if valor_pago > 0 and valor_pago < base_minima:
+                st.info(f"⚠️ El pago (${valor_pago:,.0f}) no supera la base mínima de retención (${base_minima:,.0f}). **No aplica retención.**")
+            elif retencion > 0:
+                st.success(
+                    f"✅ Debes retener **${retencion:,.0f}** al beneficiario y declararlo en el mes de {mes_rete}. "
+                    f"Paga neto: **${neto_pagar:,.0f}**"
+                )
+
+            st.divider()
+            st.markdown("##### Acumulado de retenciones del período")
+            df = _df()
+            if not df.empty:
+                # Simular retenciones sobre pagos a terceros registrados
+                gastos = df[df["tipo"] == "Gasto"].copy()
+                gastos_hon = gastos[gastos["categoria"].isin(["Contabilidad y revisoría", "Otros gastos"])]
+                total_base_hon = gastos_hon["valor"].sum()
+                rete_hon = round(total_base_hon * 0.11)
+                gastos_serv = gastos[gastos["categoria"].isin(["Software y suscripciones", "Publicidad y marketing", "Transporte y logística"])]
+                total_base_serv = gastos_serv["valor"].sum()
+                rete_serv = round(total_base_serv * 0.04)
+                total_rete = rete_hon + rete_serv
+
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Rete. honorarios estimada", f"${rete_hon:,.0f}")
+                c2.metric("Rete. servicios estimada",  f"${rete_serv:,.0f}")
+                c3.metric("Total retenciones período", f"${total_rete:,.0f}")
+                st.caption("* Estimado basado en los gastos registrados. Valida con tu contador.")
+            else:
+                st.info("Registra movimientos para ver el acumulado de retenciones.")
+
+        # ── ICA PEREIRA ──
+        with sub_ica:
+            st.markdown("#### Industria y Comercio — Pereira (Risaralda)")
+            st.markdown(
+                "<p style='color:#7B9BB5;font-size:.85rem'>"
+                "Tarifa ICA Pereira 2024 · Declaración bimestral.</p>",
+                unsafe_allow_html=True
+            )
+
+            TARIFAS_ICA = {
+                "Servicios profesionales y consultoría": 8.0,
+                "Actividades comerciales":               5.0,
+                "Actividades industriales":              4.0,
+                "Servicios financieros":                10.0,
+                "Restaurantes y hoteles":                6.0,
+                "Transporte":                            4.5,
+                "Construcción":                          4.0,
+                "Salud":                                 3.0,
+                "Educación":                             2.0,
+            }
+
+            actividad_ica = st.selectbox(
+                "Actividad económica principal",
+                list(TARIFAS_ICA.keys()),
+                key="ica_actividad"
+            )
+            tarifa_ica = TARIFAS_ICA[actividad_ica]
+
+            st.markdown(f"**Tarifa aplicable:** {tarifa_ica} × 1.000 ({tarifa_ica/10:.1f}‰)")
+
+            bimestres_ica = [
+                "Bimestre 1 (Ene-Feb)", "Bimestre 2 (Mar-Abr)",
+                "Bimestre 3 (May-Jun)", "Bimestre 4 (Jul-Ago)",
+                "Bimestre 5 (Sep-Oct)", "Bimestre 6 (Nov-Dic)",
+            ]
+            mapa_bim = {
+                "Bimestre 1 (Ene-Feb)": [1,2], "Bimestre 2 (Mar-Abr)": [3,4],
+                "Bimestre 3 (May-Jun)": [5,6], "Bimestre 4 (Jul-Ago)": [7,8],
+                "Bimestre 5 (Sep-Oct)": [9,10], "Bimestre 6 (Nov-Dic)": [11,12],
+            }
+            bim_sel = st.selectbox("Bimestre a declarar", bimestres_ica, key="ica_bim")
+            meses_bim = mapa_bim[bim_sel]
+
+            df = _df()
+            if not df.empty:
+                df_bim = df[
+                    (df["tipo"] == "Ingreso") &
+                    (df["fecha"].dt.month.isin(meses_bim))
+                ]
+                ingresos_bim = df_bim["valor"].sum()
+                ica_bim = round(ingresos_bim * tarifa_ica / 1000)
+
+                st.divider()
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Ingresos del bimestre", f"${ingresos_bim:,.0f}")
+                c2.metric(f"Tarifa ICA ({tarifa_ica}×1000)", f"{tarifa_ica/10:.1f}‰")
+                c3.metric("ICA a pagar", f"${ica_bim:,.0f}")
+
+                if ica_bim > 0:
+                    st.success(
+                        f"💡 Por el {bim_sel} debes declarar y pagar **${ica_bim:,.0f}** de ICA "
+                        f"a la Alcaldía de Pereira. Plazo: últimos días del mes siguiente al bimestre."
+                    )
+            else:
+                st.info("Registra ingresos para calcular el ICA.")
+
+        # ── PRESTACIONES SOCIALES ──
+        with sub_presta:
+            st.markdown("#### Prestaciones Sociales y Carga Laboral")
+            st.markdown(
+                "<p style='color:#7B9BB5;font-size:.85rem'>"
+                "Calcula cesantías, prima, vacaciones y parafiscales por empleado.</p>",
+                unsafe_allow_html=True
+            )
+
+            st.markdown("##### Agregar empleado")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                emp_nombre = st.text_input("Nombre empleado", key="emp_nombre")
+                salario    = st.number_input("Salario básico ($)", min_value=0, step=100_000,
+                                             value=1_750_905, key="emp_salario")
+            with c2:
+                aux_transporte = st.checkbox("Incluir auxilio de transporte ($249.095)", value=True, key="emp_aux")
+                meses_trabajados = st.number_input("Meses trabajados (período)", min_value=1, max_value=12,
+                                                    value=1, key="emp_meses")
+            with c3:
+                st.markdown("<br>", unsafe_allow_html=True)
+                aux_val = 249_095 if aux_transporte else 0
+                salario_total = salario + aux_val
+
+                # Prestaciones (sobre salario sin auxilio transporte para algunos)
+                cesantias      = round(salario * meses_trabajados / 12)
+                int_cesantias  = round(cesantias * 0.12)
+                prima          = round(salario_total * meses_trabajados / 12)
+                vacaciones     = round(salario * meses_trabajados / 24)
+
+                # Parafiscales (sobre salario)
+                salud_emp      = round(salario * 0.04)   # empleado paga 4%
+                pension_emp    = round(salario * 0.04)   # empleado paga 4%
+                salud_emp_er   = round(salario * 0.085)  # empleador paga 8.5%
+                pension_emp_er = round(salario * 0.12)   # empleador paga 12%
+                arl            = round(salario * 0.00522) # clase I riesgo
+                caja           = round(salario * 0.04)
+                sena           = round(salario * 0.02)
+                icbf           = round(salario * 0.03)
+
+                carga_total = (cesantias + int_cesantias + prima + vacaciones +
+                               salud_emp_er + pension_emp_er + arl + caja + sena + icbf)
+
+                st.metric("Carga total empleador/mes", f"${carga_total + salario_total:,.0f}")
+
+            if st.button("📊 Ver liquidación detallada", type="primary", key="btn_presta"):
+                st.divider()
+                st.markdown(f"##### Liquidación: {emp_nombre or 'Empleado'} — {meses_trabajados} mes(es)")
+
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown("**Prestaciones sociales:**")
+                    items_presta = [
+                        ("Cesantías (8.33%)",          cesantias),
+                        ("Intereses cesantías (1%)",    int_cesantias),
+                        ("Prima de servicios (8.33%)",  prima),
+                        ("Vacaciones (4.17%)",          vacaciones),
+                    ]
+                    for label, val in items_presta:
+                        col_a, col_b = st.columns([3,1])
+                        col_a.write(label)
+                        col_b.write(f"**${val:,.0f}**")
+
+                with c2:
+                    st.markdown("**Seguridad social y parafiscales (empleador):**")
+                    items_para = [
+                        ("Salud empleador (8.5%)",   salud_emp_er),
+                        ("Pensión empleador (12%)",  pension_emp_er),
+                        ("ARL clase I (0.522%)",     arl),
+                        ("Caja compensación (4%)",   caja),
+                        ("SENA (2%)",                sena),
+                        ("ICBF (3%)",                icbf),
+                    ]
+                    for label, val in items_para:
+                        col_a, col_b = st.columns([3,1])
+                        col_a.write(label)
+                        col_b.write(f"**${val:,.0f}**")
+
+                st.divider()
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Salario + auxilio", f"${salario_total:,.0f}")
+                col2.metric("Prestaciones",      f"${cesantias+int_cesantias+prima+vacaciones:,.0f}")
+                col3.metric("Parafiscales",      f"${salud_emp_er+pension_emp_er+arl+caja+sena+icbf:,.0f}")
+                col4.metric("COSTO TOTAL/MES",   f"${carga_total + salario_total:,.0f}")
+
+                pct_carga = (carga_total / salario * 100)
+                st.info(f"💡 La carga prestacional y parafiscal representa el **{pct_carga:.1f}%** del salario básico. "
+                        f"Por cada $1.000.000 de salario, el empleador paga aprox. ${pct_carga*10_000:,.0f} adicionales.")
+
+        # ── ESTIMADO RENTA ──
+        with sub_renta:
+            st.markdown("#### Estimado Declaración de Renta")
+            st.markdown(
+                "<p style='color:#7B9BB5;font-size:.85rem'>"
+                "Estimación orientativa para preparar la información con tu contador. "
+                "No reemplaza la declaración oficial.</p>",
+                unsafe_allow_html=True
+            )
+
+            df = _df()
+            if df.empty:
+                st.info("Registra movimientos para estimar la renta.")
+            else:
+                año_renta = st.selectbox("Año gravable", sorted(df["fecha"].dt.year.unique(), reverse=True), key="renta_año")
+                df_año = df[df["fecha"].dt.year == año_renta]
+
+                ingresos_brutos  = df_año[df_año["tipo"]=="Ingreso"]["valor"].sum()
+                costos_gastos    = df_año[df_año["tipo"]=="Gasto"]["valor"].sum()
+                renta_bruta      = ingresos_brutos - costos_gastos
+
+                st.divider()
+                st.markdown("##### Depuración básica de renta")
+
+                c1, c2 = st.columns(2)
+                with c1:
+                    ded_gmf        = st.number_input("4×1000 (GMF) pagado", min_value=0, step=100_000, key="renta_gmf",
+                                                      help="El 50% del GMF es deducible")
+                    ded_medicina   = st.number_input("Medicina prepagada / seguros salud", min_value=0, step=100_000, key="renta_med")
+                    ded_educacion  = st.number_input("Pagos educación (hasta 200 UVT)", min_value=0, step=100_000, key="renta_edu")
+                with c2:
+                    ded_vivienda   = st.number_input("Intereses crédito de vivienda", min_value=0, step=100_000, key="renta_viv")
+                    ded_pension    = st.number_input("Aportes voluntarios pensión / AFC", min_value=0, step=100_000, key="renta_pen")
+                    otros_ded      = st.number_input("Otras deducciones", min_value=0, step=100_000, key="renta_otros")
+
+                total_deducciones = (ded_gmf * 0.5 + ded_medicina + ded_educacion +
+                                     ded_vivienda + ded_pension + otros_ded)
+                renta_liquida = max(renta_bruta - total_deducciones, 0)
+                renta_uvt     = renta_liquida / UVT
+
+                # Tabla de tarifas renta 2024 (Art. 241 ET)
+                if renta_uvt <= 1090:
+                    impuesto = 0
+                    tarifa_renta = 0
+                elif renta_uvt <= 1700:
+                    impuesto = (renta_uvt - 1090) * 0.19 * UVT
+                    tarifa_renta = 19
+                elif renta_uvt <= 4100:
+                    impuesto = ((renta_uvt - 1700) * 0.28 + 116) * UVT
+                    tarifa_renta = 28
+                elif renta_uvt <= 8670:
+                    impuesto = ((renta_uvt - 4100) * 0.33 + 788) * UVT
+                    tarifa_renta = 33
+                elif renta_uvt <= 18970:
+                    impuesto = ((renta_uvt - 8670) * 0.35 + 2296) * UVT
+                    tarifa_renta = 35
+                elif renta_uvt <= 31000:
+                    impuesto = ((renta_uvt - 18970) * 0.37 + 5901) * UVT
+                    tarifa_renta = 37
+                else:
+                    impuesto = ((renta_uvt - 31000) * 0.39 + 10352) * UVT
+                    tarifa_renta = 39
+
+                impuesto = round(impuesto)
+
+                st.divider()
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Ingresos brutos",     f"${ingresos_brutos:,.0f}")
+                c2.metric("Costos y gastos",      f"${costos_gastos:,.0f}")
+                c3.metric("Deducciones",          f"${total_deducciones:,.0f}")
+                c4.metric("Renta líquida",        f"${renta_liquida:,.0f}")
+
+                st.divider()
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Renta en UVT",         f"{renta_uvt:,.1f} UVT")
+                c2.metric(f"Tarifa marginal",      f"{tarifa_renta}%")
+                c3.metric("Impuesto estimado",     f"${impuesto:,.0f}")
+
+                if impuesto == 0:
+                    st.success("✅ Con estos datos no habría impuesto de renta a pagar. Confirma con tu contador.")
+                else:
+                    st.warning(
+                        f"⚠️ Impuesto de renta estimado: **${impuesto:,.0f}** "
+                        f"(tarifa marginal {tarifa_renta}%). Este es un estimado — tu contador "
+                        f"puede optimizar deducciones y aplicar descuentos tributarios."
+                    )
+
+                st.caption(f"* Cálculo basado en tarifas Art. 241 ET. UVT 2024: ${UVT:,.0f}")
+
+        # ── REGISTROS Y LICENCIAS ──
+        with sub_registros:
+            st.markdown("#### Registros, Licencias y Obligaciones Formales")
+            st.markdown(
+                "<p style='color:#7B9BB5;font-size:.85rem'>"
+                "Calendario de obligaciones formales para empresas en Pereira.</p>",
+                unsafe_allow_html=True
+            )
+
+            mes_actual = date.today().month
+            año_actual = date.today().year
+
+            obligaciones = [
+                {
+                    "obligacion": "Renovación Cámara de Comercio",
+                    "periodicidad": "Anual",
+                    "mes_limite": 3,
+                    "descripcion": "Renovar matrícula mercantil antes del 31 de marzo",
+                    "costo_aprox": "Según activos. Desde ~$150.000",
+                    "entidad": "Cámara de Comercio de Pereira",
+                },
+                {
+                    "obligacion": "Declaración ICA Bimestral",
+                    "periodicidad": "Bimestral",
+                    "mes_limite": None,
+                    "descripcion": "Declarar y pagar ICA bimestral en la Alcaldía de Pereira",
+                    "costo_aprox": "Según tarifa actividad",
+                    "entidad": "Alcaldía de Pereira — Hacienda",
+                },
+                {
+                    "obligacion": "Declaración IVA",
+                    "periodicidad": "Bimestral/Cuatrimestral",
+                    "mes_limite": None,
+                    "descripcion": "Bimestral si ingresos > 92.000 UVT, cuatrimestral si menor",
+                    "costo_aprox": "IVA cobrado - IVA descontable",
+                    "entidad": "DIAN",
+                },
+                {
+                    "obligacion": "Retención en la Fuente",
+                    "periodicidad": "Mensual",
+                    "mes_limite": None,
+                    "descripcion": "Declarar y pagar retenciones practicadas el mes anterior",
+                    "costo_aprox": "Según retenciones practicadas",
+                    "entidad": "DIAN",
+                },
+                {
+                    "obligacion": "SIMPLE / Anticipo bimestral",
+                    "periodicidad": "Bimestral",
+                    "mes_limite": None,
+                    "descripcion": "Pagar anticipo bimestral del impuesto SIMPLE",
+                    "costo_aprox": "Según tarifa e ingresos",
+                    "entidad": "DIAN",
+                },
+                {
+                    "obligacion": "Declaración de Renta",
+                    "periodicidad": "Anual",
+                    "mes_limite": 8,
+                    "descripcion": "Personas naturales: agosto. Empresas: abril",
+                    "costo_aprox": "Según impuesto liquidado",
+                    "entidad": "DIAN",
+                },
+                {
+                    "obligacion": "Información Exógena",
+                    "periodicidad": "Anual",
+                    "mes_limite": 4,
+                    "descripcion": "Si superas topes DIAN, reportar transacciones del año anterior",
+                    "costo_aprox": "Sin costo directo",
+                    "entidad": "DIAN",
+                },
+                {
+                    "obligacion": "Pago seguridad social (nómina)",
+                    "periodicidad": "Mensual",
+                    "mes_limite": None,
+                    "descripcion": "Salud, pensión y ARL de empleados mediante PILA",
+                    "costo_aprox": "24.522% del salario (empleador)",
+                    "entidad": "Operadores PILA",
+                },
+            ]
+
+            for ob in obligaciones:
+                vence_pronto = (ob["mes_limite"] and ob["mes_limite"] == mes_actual)
+                icon = "🔴" if vence_pronto else "🟡" if ob["periodicidad"] == "Mensual" else "🟢"
+                with st.expander(f"{icon} {ob['obligacion']} — {ob['periodicidad']}"):
+                    c1, c2 = st.columns(2)
+                    c1.markdown(f"**Descripción:** {ob['descripcion']}")
+                    c1.markdown(f"**Entidad:** {ob['entidad']}")
+                    c2.markdown(f"**Periodicidad:** {ob['periodicidad']}")
+                    c2.markdown(f"**Costo aprox:** {ob['costo_aprox']}")
+                    if vence_pronto:
+                        st.error(f"⚠️ Esta obligación vence este mes ({MESES[mes_actual-1]} {año_actual})")
+
+            st.divider()
+            st.info(
+                "💡 **Consejo:** Lleva estas fechas en tu calendario y "
+                "consulta con tu contador al menos 2 semanas antes de cada vencimiento. "
+                "Las sanciones por extemporaneidad en Colombia pueden ser del 5% al 200% del impuesto."
+            )
