@@ -170,6 +170,8 @@ def app_principal():
     elif "Anomalias"    in page: load_module("anomalias", base/"_anomalias.py").show()
     elif "Exportar"     in page: load_module("exportar", base/"_exportar.py").show()
     elif "Factura" in page: load_module("facturacion", base/"_facturacion.py").show()
+    elif "Contabilidad" in page:
+    load_module("contabilidad", base/"_contabilidad.py").show()  
 
 if not st.session_state.get("logged_in"):
     pantalla_login()
