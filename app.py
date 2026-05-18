@@ -161,7 +161,7 @@ def app_principal():
 
     
     if   "Inicio"       in page: load_module("home", base/"_home.py").show()
-    elif "Revisor" in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
+    elif "Revisor"      in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
     elif "PDF"          in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
     elif "Mirofish"     in page: load_module("ml_prediccion", base/"_ml_prediccion.py").show()
     elif "Dashboards"   in page: load_module("dashboards", base/"_dashboards.py").show()
@@ -169,7 +169,7 @@ def app_principal():
     elif "Consultor"    in page: load_module("chat_datos", base/"_chat_datos.py").show()
     elif "Anomalias"    in page: load_module("anomalias", base/"_anomalias.py").show()
     elif "Exportar"     in page: load_module("exportar", base/"_exportar.py").show()
-    elif "Factura" in page: load_module("facturacion", base/"_facturacion.py").show()
+    elif "Factura"      in page: load_module("facturacion", base/"_facturacion.py").show()
     elif "Contabilidad" in page: load_module("contabilidad", base/"_contabilidad.py").show()  
 
 if not st.session_state.get("logged_in"):
