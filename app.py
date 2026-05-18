@@ -1,3 +1,23 @@
+# ── Auto-seed: crea la empresa demo si la BD esta vacia ──
+def _auto_seed():
+    try:
+        import sqlite3, os, subprocess
+        db_path = "/data/salazanalytics.db"
+        if not os.path.exists(db_path):
+            return
+        conn = sqlite3.connect(db_path)
+        try:
+            count = conn.execute("SELECT COUNT(*) FROM empresas").fetchone()[0]
+        except Exception:
+            count = 0
+        conn.close()
+        if count == 0:
+            subprocess.run(["python3", "/app/seed_demo.py"], capture_output=True)
+    except Exception:
+        pass
+
+_auto_seed()
+
 import streamlit as st
 import hashlib
 from pathlib import Path
