@@ -164,9 +164,22 @@ def empresa_cambiar_password(nit: str, nueva: str):
 # MOVIMIENTOS CONTABLES
 # ─────────────────────────────────────────────
 
+def _asegurar_empresa(nit_empresa: str):
+    """Crea una empresa temporal si no existe (usuarios internos / demo)."""
+    with get_conn() as conn:
+        existe = conn.execute("SELECT 1 FROM empresas WHERE nit=?", (nit_empresa,)).fetchone()
+        if not existe:
+            conn.execute(
+                """INSERT OR IGNORE INTO empresas (nit, nombre, email, password_hash)
+                   VALUES (?, ?, ?, ?)""",
+                (nit_empresa, nit_empresa, f"{nit_empresa}@salazanalytics.com",
+                 _hash("interno2026"))
+            )
+
 def movimiento_crear(nit_empresa: str, fecha: str, tipo: str, categoria: str,
                      descripcion: str, valor: float, iva: float,
                      valor_iva: float, total: float) -> int:
+    _asegurar_empresa(nit_empresa)
     with get_conn() as conn:
         cur = conn.execute(
             """INSERT INTO movimientos
