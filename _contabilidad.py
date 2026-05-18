@@ -792,6 +792,189 @@ def show():
                     )
                     st.plotly_chart(fig3, use_container_width=True)
 
+
+            # ── FLUJO DE CAJA ──
+            st.divider()
+            st.markdown("#### 💧 Flujo de Caja Mensual")
+
+            df_flujo = df2.copy()
+            flujo_mes = df_flujo.groupby(["mes_num","mes","tipo"])["total"].sum().unstack(fill_value=0).reset_index()
+            if "Ingreso" not in flujo_mes.columns:
+                flujo_mes["Ingreso"] = 0
+            if "Gasto" not in flujo_mes.columns:
+                flujo_mes["Gasto"] = 0
+            flujo_mes = flujo_mes.sort_values("mes_num")
+            flujo_mes["Flujo neto"]    = flujo_mes["Ingreso"] - flujo_mes["Gasto"]
+            flujo_mes["Acumulado"]     = flujo_mes["Flujo neto"].cumsum()
+
+            fig_flujo = go.Figure()
+            fig_flujo.add_trace(go.Bar(
+                x=flujo_mes["mes"], y=flujo_mes["Ingreso"],
+                name="Ingresos", marker_color="#00C2FF", opacity=0.8
+            ))
+            fig_flujo.add_trace(go.Bar(
+                x=flujo_mes["mes"], y=[-g for g in flujo_mes["Gasto"]],
+                name="Gastos", marker_color="#7B2FBE", opacity=0.8
+            ))
+            fig_flujo.add_trace(go.Scatter(
+                x=flujo_mes["mes"], y=flujo_mes["Acumulado"],
+                name="Acumulado", mode="lines+markers",
+                line=dict(color="#FFD700", width=2.5),
+                marker=dict(size=8, color="#FFD700")
+            ))
+            fig_flujo.update_layout(
+                title="Flujo de caja — entradas, salidas y acumulado",
+                barmode="relative",
+                plot_bgcolor="#0D1B2A", paper_bgcolor="#0D1B2A",
+                font_color="#E8F4FD", title_font_color="#00C2FF",
+                legend=dict(orientation="h", y=1.1),
+                yaxis_title="Pesos ($)",
+                template="plotly_dark"
+            )
+            st.plotly_chart(fig_flujo, use_container_width=True)
+
+            # Tabla resumen flujo
+            flujo_show = flujo_mes[["mes","Ingreso","Gasto","Flujo neto","Acumulado"]].copy()
+            flujo_show.columns = ["Mes","Ingresos","Gastos","Flujo Neto","Acumulado"]
+            for col in ["Ingresos","Gastos","Flujo Neto","Acumulado"]:
+                flujo_show[col] = flujo_show[col].apply(lambda x: f"${x:,.0f}")
+            st.dataframe(flujo_show, use_container_width=True, hide_index=True)
+
+            # ── MÁRGENES Y RENTABILIDAD ──
+            st.divider()
+            st.markdown("#### 📐 Márgenes y Rentabilidad")
+
+            # Categorías de costo de ventas vs gastos operacionales
+            cats_costo = ["Compra de mercancia", "Nómina y salarios"]
+            cats_fijos = ["Arriendo", "Internet y telecomunicaciones",
+                          "Servicios públicos", "Software y suscripciones",
+                          "Contabilidad y revisoría", "Gastos bancarios"]
+
+            ingresos_b    = df[df["tipo"]=="Ingreso"]["valor"].sum()
+            costo_ventas  = df[(df["tipo"]=="Gasto") & (df["categoria"].isin(cats_costo))]["total"].sum()
+            gastos_fijos  = df[(df["tipo"]=="Gasto") & (df["categoria"].isin(cats_fijos))]["total"].sum()
+            gastos_var    = df[(df["tipo"]=="Gasto") & (~df["categoria"].isin(cats_costo + cats_fijos))]["total"].sum()
+            total_gastos_op = costo_ventas + gastos_fijos + gastos_var
+
+            utilidad_bruta = ingresos_b - costo_ventas
+            utilidad_op    = ingresos_b - total_gastos_op
+            utilidad_neta  = total_ingresos - total_gastos
+
+            margen_bruto   = (utilidad_bruta / ingresos_b * 100) if ingresos_b > 0 else 0
+            margen_op      = (utilidad_op    / ingresos_b * 100) if ingresos_b > 0 else 0
+            margen_neto    = (utilidad_neta  / total_ingresos * 100) if total_ingresos > 0 else 0
+            ebitda         = utilidad_op  # simplificado sin depreciación
+
+            # Semáforo de salud financiera
+            def _semaforo(margen, umbrales):
+                if margen >= umbrales[1]:   return "🟢"
+                elif margen >= umbrales[0]: return "🟡"
+                else:                       return "🔴"
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric(
+                f"{_semaforo(margen_bruto, (20,40))} Margen Bruto",
+                f"{margen_bruto:.1f}%",
+                delta=f"${utilidad_bruta:,.0f}"
+            )
+            c2.metric(
+                f"{_semaforo(margen_op, (10,25))} Margen Operacional",
+                f"{margen_op:.1f}%",
+                delta=f"${utilidad_op:,.0f}"
+            )
+            c3.metric(
+                f"{_semaforo(margen_neto, (5,15))} Margen Neto",
+                f"{margen_neto:.1f}%",
+                delta=f"${utilidad_neta:,.0f}"
+            )
+            c4.metric("⚡ EBITDA aprox.", f"${ebitda:,.0f}")
+
+            # Gráfico de márgenes por mes
+            mg_mes = df2.groupby(["mes_num","mes","tipo"])["valor"].sum().unstack(fill_value=0).reset_index()
+            if "Ingreso" not in mg_mes.columns: mg_mes["Ingreso"] = 0
+            if "Gasto"   not in mg_mes.columns: mg_mes["Gasto"]   = 0
+            mg_mes = mg_mes.sort_values("mes_num")
+            mg_mes["Margen"] = ((mg_mes["Ingreso"] - mg_mes["Gasto"]) / mg_mes["Ingreso"].replace(0,1) * 100).round(1)
+
+            fig_mg = go.Figure()
+            fig_mg.add_trace(go.Scatter(
+                x=mg_mes["mes"], y=mg_mes["Margen"],
+                mode="lines+markers+text",
+                text=[f"{m:.1f}%" for m in mg_mes["Margen"]],
+                textposition="top center",
+                line=dict(color="#00C2FF", width=2.5),
+                marker=dict(size=10,
+                            color=["#00A86B" if m >= 10 else "#FFD700" if m >= 0 else "#E53935"
+                                   for m in mg_mes["Margen"]],
+                            line=dict(color="#0D1B2A", width=2)),
+                name="Margen neto %",
+                fill="tozeroy",
+                fillcolor="rgba(0,194,255,0.08)"
+            ))
+            fig_mg.add_hline(y=0,  line_dash="dash", line_color="#E53935", opacity=0.5, annotation_text="Punto cero")
+            fig_mg.add_hline(y=10, line_dash="dot",  line_color="#00A86B", opacity=0.4, annotation_text="Meta 10%")
+            fig_mg.update_layout(
+                title="Margen neto por mes (%)",
+                plot_bgcolor="#0D1B2A", paper_bgcolor="#0D1B2A",
+                font_color="#E8F4FD", title_font_color="#00C2FF",
+                yaxis_title="Margen (%)", template="plotly_dark"
+            )
+            st.plotly_chart(fig_mg, use_container_width=True)
+
+            # ── INDICADORES CLAVE ──
+            st.divider()
+            st.markdown("#### 🎯 Indicadores Clave")
+
+            # Punto de equilibrio
+            if gastos_fijos > 0 and ingresos_b > 0:
+                ratio_cv = costo_ventas / ingresos_b if ingresos_b > 0 else 0
+                margen_contrib = 1 - ratio_cv
+                punto_eq = gastos_fijos / margen_contrib if margen_contrib > 0 else 0
+            else:
+                punto_eq = 0
+
+            razon_gf_gv  = (gastos_fijos / total_gastos_op * 100) if total_gastos_op > 0 else 0
+            cobertura    = (utilidad_op / gastos_fijos) if gastos_fijos > 0 else 0
+            meses_datos  = df2["mes_num"].nunique()
+            ing_promedio = total_ingresos / meses_datos if meses_datos > 0 else 0
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("⚖️ Punto de Equilibrio",
+                      f"${punto_eq:,.0f}",
+                      help="Ingresos mínimos para cubrir costos fijos")
+            c2.metric("🔒 Gastos Fijos / Total",
+                      f"{razon_gf_gv:.1f}%",
+                      help="Qué porcentaje de tus gastos son fijos")
+            c3.metric("🛡️ Cobertura Gastos Fijos",
+                      f"{cobertura:.2f}x",
+                      help="Cuántas veces la utilidad cubre los gastos fijos")
+            c4.metric("📅 Ingreso Promedio/Mes",
+                      f"${ing_promedio:,.0f}")
+
+            # Diagnóstico automático
+            diagnosticos = []
+            if margen_neto < 0:
+                diagnosticos.append("🔴 Estás perdiendo dinero — los gastos superan los ingresos.")
+            elif margen_neto < 10:
+                diagnosticos.append("🟡 Margen bajo — revisa si puedes reducir costos variables.")
+            else:
+                diagnosticos.append("🟢 Margen saludable — sigue monitoreando mes a mes.")
+
+            if punto_eq > 0 and total_ingresos < punto_eq:
+                diagnosticos.append(f"⚠️ No alcanzaste el punto de equilibrio. Necesitas ${punto_eq - total_ingresos:,.0f} más en ingresos.")
+            elif punto_eq > 0:
+                diagnosticos.append(f"✅ Superaste el punto de equilibrio por ${total_ingresos - punto_eq:,.0f}.")
+
+            if razon_gf_gv > 70:
+                diagnosticos.append("⚠️ Estructura de costos rígida — más del 70% son gastos fijos.")
+
+            if cobertura > 0 and cobertura < 1:
+                diagnosticos.append("🔴 La utilidad operacional no alcanza a cubrir los gastos fijos.")
+
+            st.markdown("**Diagnóstico automático:**")
+            for d in diagnosticos:
+                st.markdown(d)
+
     # ══════════════════════════════════════════
     # TAB IVA Y SIMPLE
     # ══════════════════════════════════════════
