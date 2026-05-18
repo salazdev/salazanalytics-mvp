@@ -15,9 +15,16 @@ from datetime import datetime, date
 # ─────────────────────────────────────────────
 
 def _db_path() -> str:
-    data_dir = Path("/data")
-    if data_dir.exists() and os.access(data_dir, os.W_OK):
-        return str(data_dir / "salazanalytics.db")
+    # Orden de preferencia: volumen EasyPanel → /data → /tmp
+    candidatos = [
+        "/etc/easypanel/projects/salazanalytics/streamlit/volumes/data/salazanalytics.db",
+        "/data/salazanalytics.db",
+        "/tmp/salazanalytics.db",
+    ]
+    for path in candidatos:
+        directorio = str(Path(path).parent)
+        if Path(directorio).exists() and os.access(directorio, os.W_OK):
+            return path
     return "/tmp/salazanalytics.db"
 
 def get_conn() -> sqlite3.Connection:
