@@ -890,10 +890,12 @@ def show():
                 c3.metric(f"Tarifa SIMPLE ({rango})", f"{tarifa}%")
                 c4.metric("SIMPLE Estimado", f"${simple_estimado:,.0f}")
 
+                ingresos_fmt = f"${ingresos_base:,.0f}"
+                simple_fmt   = f"${simple_estimado:,.0f}"
                 st.info(
-                    f"💡 Con ingresos de ${ingresos_base:,.0f} en este período, "
-                    f"tu tarifa SIMPLE aplicable es del **{tarifa}%** "
-                    f"(rango {rango}). SIMPLE estimado: **${simple_estimado:,.0f}**. "
+                    f"Ingresos del periodo: {ingresos_fmt} — "
+                    f"Tarifa SIMPLE: {tarifa}% (rango {rango}) — "
+                    f"SIMPLE estimado: {simple_fmt}. "
                     f"Recuerda que SIMPLE ya incluye IVA, Renta, ICA y otras contribuciones."
                 )
 
