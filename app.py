@@ -94,7 +94,6 @@ def pantalla_login():
                 st.session_state["usuario"] = usuario
                 st.session_state["rol"] = ROLES.get(usuario, "Cliente")
                 st.rerun()
-                
             else:
                 st.error("Usuario o contrasena incorrectos.")
         st.markdown("""
@@ -107,7 +106,7 @@ def pantalla_login():
         </div>
         """, unsafe_allow_html=True)
 
-def app_principal():  
+def app_principal():
     base = Path(__file__).parent
 
     with st.sidebar:
@@ -127,27 +126,27 @@ def app_principal():
         st.divider()
 
         page = st.radio(
-          "Menu",
-          [
-              "🏠 Inicio",
-              "⚖️ Revisoria y Cumplimiento",
-              "🔮 Mirofish Predictor",
-              "📊 Dashboards Financieros",
-              "📗 Auditoria de Excel",
-              "💬 Consultor Contable IA",
-              "⚙️ Automatizacion n8n",
-              "🔍 Anomalias",
-              "📑 Exportar",
-              "🧾 Facturacion",
-          ],
-          label_visibility="collapsed",
-          key="pagina_actual"
-      )
+            "Menu",
+            [
+                "🏠 Inicio",
+                "⚖️ Revisoria y Cumplimiento",
+                "🔮 Mirofish Predictor",
+                "📊 Dashboards Financieros",
+                "📗 Auditoria de Excel",
+                "💬 Consultor Contable IA",
+                "⚙️ Automatizacion n8n",
+                "🔍 Anomalias",
+                "📑 Exportar",
+                "🧾 Facturacion",
+                "📒 Contabilidad",
+            ],
+            label_visibility="collapsed",
+            key="pagina_actual"
+        )
 
         if "pagina_actual" not in st.session_state:
             st.session_state["pagina_actual"] = "🏠 Inicio"
 
-        
         st.divider()
 
         if st.button("Cerrar sesion", use_container_width=True):
@@ -159,18 +158,17 @@ def app_principal():
             "<p style='color:#7B9BB5;font-size:.75rem;text-align:center'>salazanalytics.com</p>",
             unsafe_allow_html=True)
 
-    
-    if   "Inicio"       in page: load_module("home", base/"_home.py").show()
-    elif "Revisor"      in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
-    elif "PDF"          in page: load_module("pdf_ia", base/"_pdf_ia.py").show()
-    elif "Mirofish"     in page: load_module("ml_prediccion", base/"_ml_prediccion.py").show()
-    elif "Dashboards"   in page: load_module("dashboards", base/"_dashboards.py").show()
-    elif "Excel"        in page: load_module("excel_ia", base/"_excel_ia.py").show()
-    elif "Consultor"    in page: load_module("chat_datos", base/"_chat_datos.py").show()
-    elif "Anomalias"    in page: load_module("anomalias", base/"_anomalias.py").show()
-    elif "Exportar"     in page: load_module("exportar", base/"_exportar.py").show()
-    elif "Factura"      in page: load_module("facturacion", base/"_facturacion.py").show()
-    elif "Contabilidad" in page: load_module("contabilidad", base/"_contabilidad.py").show()  
+    if   "Inicio"        in page: load_module("home",         base/"_home.py").show()
+    elif "Revisor"       in page: load_module("pdf_ia",        base/"_pdf_ia.py").show()
+    elif "PDF"           in page: load_module("pdf_ia",        base/"_pdf_ia.py").show()
+    elif "Mirofish"      in page: load_module("ml_prediccion", base/"_ml_prediccion.py").show()
+    elif "Dashboards"    in page: load_module("dashboards",    base/"_dashboards.py").show()
+    elif "Excel"         in page: load_module("excel_ia",      base/"_excel_ia.py").show()
+    elif "Consultor"     in page: load_module("chat_datos",    base/"_chat_datos.py").show()
+    elif "Anomalias"     in page: load_module("anomalias",     base/"_anomalias.py").show()
+    elif "Exportar"      in page: load_module("exportar",      base/"_exportar.py").show()
+    elif "Factura"       in page: load_module("facturacion",   base/"_facturacion.py").show()
+    elif "Contabilidad"  in page: load_module("contabilidad",  base/"_contabilidad.py").show()
 
 if not st.session_state.get("logged_in"):
     pantalla_login()
