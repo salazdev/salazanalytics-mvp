@@ -401,22 +401,11 @@ def show():
             if filtro_cat != "Todas":
                 df_f = df_f[df_f["categoria"] == filtro_cat]
 
-            # Mostrar con colores
+            # Mostrar tabla
             df_show = df_f[["fecha","tipo","categoria","descripcion","valor","iva","valor_iva","total"]].copy()
             df_show["fecha"] = df_show["fecha"].dt.strftime("%d/%m/%Y")
-
-            def _color_fila(row):
-                color = "#1a3a1a" if row["tipo"] == "Ingreso" else "#3a1a1a"
-                return [f"background-color: {color}"] * len(row)
-
-            styled = df_show.style.apply(_color_fila, axis=1)
             df_show.columns = ["Fecha","Tipo","Categoría","Descripción","Base","IVA%","Valor IVA","Total"]
-
-            st.dataframe(
-                styled,
-                use_container_width=True,
-                height=350
-            )
+            st.dataframe(df_show, use_container_width=True, height=350)
 
             # Botón eliminar último
             c1, c2 = st.columns([1, 3])
