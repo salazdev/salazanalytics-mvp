@@ -286,7 +286,6 @@ CATEGORIAS_TODAS = [
 def _generar_plantilla_excel() -> bytes:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    from openpyxl.data_validation import DataValidation
     from openpyxl.utils import get_column_letter
 
     wb = Workbook()
@@ -347,29 +346,8 @@ def _generar_plantilla_excel() -> bytes:
             if col == 2:
                 cell.fill = PatternFill("solid", start_color="FAFAFA")
 
-    # ── Validación: Tipo ──
-    dv_tipo = DataValidation(type="list", formula1='"Ingreso,Gasto"',
-                              allow_blank=False, showDropDown=False)
-    dv_tipo.error      = "Escribe Ingreso o Gasto"
-    dv_tipo.errorTitle = "Valor inválido"
-    ws.add_data_validation(dv_tipo)
-    dv_tipo.add(f"B5:B204")
 
-    # ── Validación: IVA ──
-    dv_iva = DataValidation(type="list", formula1='"0,5,19"',
-                             allow_blank=False, showDropDown=False)
-    dv_iva.error      = "Solo se permite 0, 5 o 19"
-    dv_iva.errorTitle = "IVA inválido"
-    ws.add_data_validation(dv_iva)
-    dv_iva.add("F5:F204")
 
-    # ── Validación: Valor positivo ──
-    dv_valor = DataValidation(type="whole", operator="greaterThan",
-                               formula1="0", allow_blank=True)
-    dv_valor.error      = "El valor debe ser mayor a 0"
-    dv_valor.errorTitle = "Valor inválido"
-    ws.add_data_validation(dv_valor)
-    dv_valor.add("E5:E204")
 
     # ── Hoja de instrucciones ──
     ws2 = wb.create_sheet("Instrucciones")
