@@ -1110,12 +1110,13 @@ def show():
 
         UVT = 52_374  # UVT 2026
 
-        sub_rete, sub_ica, sub_presta, sub_renta, sub_registros = st.tabs([
+        sub_rete, sub_ica, sub_presta, sub_renta, sub_registros, sub_renta26 = st.tabs([
             "✂️ Retención en la Fuente",
             "🏙️ ICA Pereira",
             "👥 Prestaciones Sociales",
             "📋 Estimado Renta",
             "📜 Registros y Licencias",
+            "📅 Declaración Renta 2026",
         ])
 
         # ── RETENCIÓN EN LA FUENTE ──
@@ -1542,6 +1543,162 @@ def show():
     # ══════════════════════════════════════════
     # TAB IMPORTAR EXCEL
     # ══════════════════════════════════════════
+    with sub_renta26:
+        st.markdown("#### 📅 Declaración de Renta 2026 — Año Gravable 2025")
+        st.markdown(
+            "<p style='color:#7B9BB5'>Información oficial actualizada con el Decreto 1474 de 2025. "
+            "Conoce quién declara, cuándo y cuánto.</p>",
+            unsafe_allow_html=True
+        )
+
+        # ── UVT ──
+        st.markdown("##### Valores UVT vigentes")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("UVT 2025", "$49.799", help="Base para calcular topes de declaración 2025")
+        c2.metric("UVT 2026", "$52.374", help="Base para sanciones y planeación 2026")
+        c3.metric("Sanción mínima 2026", "$524.000", help="Equivalente a 10 UVT 2026")
+
+        st.divider()
+
+        # ── PERSONAS NATURALES ──
+        st.markdown("##### ¿Quién declara renta en 2026? (año gravable 2025)")
+        st.markdown(
+            "<p style='color:#7B9BB5;font-size:.85rem'>"
+            "Debes declarar si al 31 de diciembre de 2025 cumples AL MENOS UNO de estos topes:</p>",
+            unsafe_allow_html=True
+        )
+
+        import pandas as pd
+        topes = pd.DataFrame({
+            "Criterio": [
+                "Patrimonio bruto",
+                "Ingresos brutos",
+                "Consumos con tarjeta de crédito",
+                "Compras y consumos totales",
+                "Consignaciones bancarias",
+            ],
+            "Límite en UVT 2025": [
+                "4.500 UVT", "1.400 UVT", "1.400 UVT", "1.400 UVT", "1.400 UVT"
+            ],
+            "Valor en COP": [
+                "$224.095.500", "$69.718.600", "$69.718.600", "$69.718.600", "$69.718.600"
+            ]
+        })
+        st.dataframe(topes, use_container_width=True, hide_index=True)
+
+        st.warning(
+            "Las consignaciones bancarias de $69.718.600 incluyen transferencias entre "
+            "cuentas propias, préstamos y otros movimientos — no solo ingresos salariales. "
+            "Si mueves dinero entre tus propias cuentas, puede que debas declarar."
+        )
+
+        # ── Verificador rápido ──
+        st.divider()
+        st.markdown("##### Verificador rápido — ¿Debo declarar?")
+        UVT_2025 = 49_799
+        c1, c2 = st.columns(2)
+        with c1:
+            v_patrimonio   = st.number_input("Patrimonio bruto a dic 2025 ($)", min_value=0, step=1_000_000, key="vr_pat")
+            v_ingresos     = st.number_input("Ingresos brutos 2025 ($)",        min_value=0, step=1_000_000, key="vr_ing")
+            v_consignaciones = st.number_input("Consignaciones bancarias 2025 ($)", min_value=0, step=1_000_000, key="vr_con")
+        with c2:
+            v_tarjeta      = st.number_input("Consumos tarjeta crédito 2025 ($)", min_value=0, step=1_000_000, key="vr_tc")
+            v_compras      = st.number_input("Compras y consumos totales 2025 ($)", min_value=0, step=1_000_000, key="vr_comp")
+
+        tope_pat = 4500 * UVT_2025
+        tope_gen = 1400 * UVT_2025
+
+        debe_declarar = []
+        if v_patrimonio   >= tope_pat: debe_declarar.append(f"Patrimonio bruto (${v_patrimonio:,.0f} >= ${tope_pat:,.0f})")
+        if v_ingresos     >= tope_gen: debe_declarar.append(f"Ingresos brutos (${v_ingresos:,.0f} >= ${tope_gen:,.0f})")
+        if v_consignaciones >= tope_gen: debe_declarar.append(f"Consignaciones (${v_consignaciones:,.0f} >= ${tope_gen:,.0f})")
+        if v_tarjeta      >= tope_gen: debe_declarar.append(f"Tarjeta crédito (${v_tarjeta:,.0f} >= ${tope_gen:,.0f})")
+        if v_compras      >= tope_gen: debe_declarar.append(f"Compras (${v_compras:,.0f} >= ${tope_gen:,.0f})")
+
+        if any([v_patrimonio, v_ingresos, v_consignaciones, v_tarjeta, v_compras]):
+            if debe_declarar:
+                st.error("Debes presentar declaración de renta 2025. Criterios que superaste:")
+                for criterio in debe_declarar:
+                    st.markdown(f"- {criterio}")
+                st.markdown("Plazo: **12 de agosto al 23 de octubre de 2026** (personas naturales)")
+            else:
+                st.success(
+                    "Con los valores ingresados NO estarías obligado a declarar renta 2025. "
+                    "Confirma con tu contador si tienes otras situaciones especiales."
+                )
+
+        st.divider()
+
+        # ── PERSONAS JURÍDICAS ──
+        st.markdown("##### Personas Jurídicas — Tarifas 2026")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Tarifa general",     "35%",  help="Sociedades nacionales y establecimientos permanentes")
+        col2.metric("Tasa mínima (TMT)",  "5%",   help="Sobre utilidad depurada")
+        col3.metric("Sobretasa financiera","5%",  help="Entidades financieras — tarifa total 40%")
+        col4.metric("Sobretasa energética","3%",  help="Generación hidroeléctrica hasta dic 2026")
+
+        st.info(
+            "Entidades financieras y aseguradoras pagan tarifa efectiva del 40% "
+            "(35% + 5% sobretasa). Hay propuesta de incrementar la sobretasa financiera al 15%."
+        )
+
+        st.divider()
+
+        # ── CALENDARIO TRIBUTARIO 2026 ──
+        st.markdown("##### Calendario Tributario 2026 — Fechas clave DIAN")
+
+        calendario = pd.DataFrame({
+            "Tipo de contribuyente": [
+                "Grandes contribuyentes",
+                "Grandes contribuyentes",
+                "Grandes contribuyentes",
+                "Personas jurídicas",
+                "Personas jurídicas",
+                "Personas naturales y sucesiones ilíquidas",
+            ],
+            "Plazo 2026": [
+                "10 — 23 de febrero",
+                "13 — 24 de abril",
+                "10 — 24 de junio",
+                "12 — 26 de mayo",
+                "9 — 23 de julio",
+                "12 ago — 23 oct",
+            ],
+            "Obligación": [
+                "Declaración + pago 1.ª cuota",
+                "Declaración + pago 2.ª cuota",
+                "Declaración + pago 3.ª cuota",
+                "Declaración + pago 1.ª cuota",
+                "Declaración + pago 2.ª cuota",
+                "Declaración + pago único",
+            ]
+        })
+
+        # Resaltar personas naturales (la más relevante para PYMEs)
+        mes_actual = date.today().month
+        st.dataframe(calendario, use_container_width=True, hide_index=True)
+
+        # Alerta si está próximo el vencimiento
+        if mes_actual in [7, 8, 9, 10]:
+            st.warning(
+                "Estamos en el período de declaración de renta para personas naturales "
+                "(12 agosto — 23 octubre 2026). Coordina con tu contador."
+            )
+        elif mes_actual in [4, 5]:
+            st.warning(
+                "Estamos próximos al plazo para personas jurídicas "
+                "(12 — 26 de mayo 2026). Coordina con tu contador."
+            )
+        else:
+            st.success("No hay vencimientos de renta inmediatos. Sigue monitoreando.")
+
+        st.divider()
+        st.info(
+            "Fuente: DIAN — Decreto 1474 de 2025. "
+            "Esta información es orientativa. Consulta siempre con tu contador "
+            "para situaciones específicas de tu empresa."
+        )
+
     with tab_importar:
         st.markdown("### 📥 Importar movimientos desde Excel")
         st.markdown(
