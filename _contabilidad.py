@@ -1621,6 +1621,77 @@ def show():
                 for criterio in debe_declarar:
                     st.markdown(f"- {criterio}")
                 st.markdown("Plazo: **12 de agosto al 23 de octubre de 2026** (personas naturales)")
+
+                st.divider()
+                st.markdown("##### ¿Tendrías que pagar o podrías tener saldo a favor?")
+                st.markdown(
+                    "<p style='color:#7B9BB5;font-size:.85rem'>"
+                    "Ingresa tus datos para estimar si pagas o te devuelven:</p>",
+                    unsafe_allow_html=True
+                )
+
+                UVT_2025 = 49_799
+                c1, c2 = st.columns(2)
+                with c1:
+                    renta_ing      = st.number_input("Ingresos totales 2025 ($)",       min_value=0, step=1_000_000, key="rr_ing",  value=v_ingresos)
+                    renta_costos   = st.number_input("Costos y gastos deducibles ($)",   min_value=0, step=1_000_000, key="rr_cos")
+                    renta_ded      = st.number_input("Deducciones (salud, vivienda...) ($)", min_value=0, step=500_000,   key="rr_ded")
+                with c2:
+                    renta_exentas  = st.number_input("Rentas exentas ($)",               min_value=0, step=1_000_000, key="rr_exe")
+                    renta_ret      = st.number_input("Retenciones en la fuente que te practicaron ($)", min_value=0, step=100_000, key="rr_ret")
+                    renta_afc      = st.number_input("Aportes AFC / pensión voluntaria ($)", min_value=0, step=500_000, key="rr_afc")
+
+                if st.button("Calcular si pago o me devuelven", type="primary", key="btn_renta_pago"):
+                    # Depuración básica
+                    total_ded      = renta_costos + renta_ded + renta_exentas + renta_afc
+                    renta_liquida  = max(renta_ing - total_ded, 0)
+                    renta_uvt      = renta_liquida / UVT_2025
+
+                    # Tarifas Art. 241 ET (base UVT 2025)
+                    if renta_uvt <= 1090:
+                        impuesto = 0; tarifa_r = 0
+                    elif renta_uvt <= 1700:
+                        impuesto = (renta_uvt - 1090) * 0.19 * UVT_2025; tarifa_r = 19
+                    elif renta_uvt <= 4100:
+                        impuesto = ((renta_uvt - 1700) * 0.28 + 116) * UVT_2025; tarifa_r = 28
+                    elif renta_uvt <= 8670:
+                        impuesto = ((renta_uvt - 4100) * 0.33 + 788) * UVT_2025; tarifa_r = 33
+                    elif renta_uvt <= 18970:
+                        impuesto = ((renta_uvt - 8670) * 0.35 + 2296) * UVT_2025; tarifa_r = 35
+                    elif renta_uvt <= 31000:
+                        impuesto = ((renta_uvt - 18970) * 0.37 + 5901) * UVT_2025; tarifa_r = 37
+                    else:
+                        impuesto = ((renta_uvt - 31000) * 0.39 + 10352) * UVT_2025; tarifa_r = 39
+
+                    impuesto   = round(impuesto)
+                    saldo_neto = impuesto - renta_ret
+
+                    st.divider()
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("Renta líquida",    f"${renta_liquida:,.0f}")
+                    col2.metric("Renta en UVT",     f"{renta_uvt:,.1f} UVT")
+                    col3.metric(f"Impuesto ({tarifa_r}%)", f"${impuesto:,.0f}")
+                    col4.metric("Retenciones",      f"${renta_ret:,.0f}")
+
+                    st.divider()
+                    if saldo_neto > 0:
+                        st.error(
+                            f"Debes declarar Y PAGAR. Impuesto a cargo: "
+                            f"${saldo_neto:,.0f} (impuesto ${impuesto:,.0f} menos "
+                            f"retenciones ${renta_ret:,.0f})."
+                        )
+                    elif saldo_neto < 0:
+                        st.success(
+                            f"Debes declarar pero tienes SALDO A FAVOR de "
+                            f"${abs(saldo_neto):,.0f}. La DIAN te devolvería ese valor."
+                        )
+                    else:
+                        st.info("Debes declarar y el impuesto queda en cero — ni pagas ni te devuelven.")
+
+                    st.caption(
+                        "Estimado orientativo basado en Art. 241 ET con UVT 2025 ($49.799). "
+                        "Confirma con tu contador — puede haber descuentos y beneficios adicionales."
+                    )
             else:
                 st.success(
                     "Con los valores ingresados NO estarías obligado a declarar renta 2025. "
