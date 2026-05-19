@@ -400,9 +400,13 @@ def _generar_plantilla_excel() -> bytes:
     return buf.getvalue()
 
 
-def _importar_desde_excel(archivo, nit_empresa: str) -> tuple[int, list[str]]:
+def _importar_desde_excel(archivo, nit_empresa: str,
+                          modo: str = "agregar",
+                          año: int = None,
+                          meses: list = None) -> tuple[int, list[str]]:
     """
     Lee el Excel del cliente y guarda los movimientos en SQLite.
+    modo: "agregar" (suma) o "reemplazar" (borra el período primero)
     Retorna (cantidad_importados, lista_de_errores)
     """
     from datetime import datetime
@@ -448,6 +452,25 @@ def _importar_desde_excel(archivo, nit_empresa: str) -> tuple[int, list[str]]:
     if df.empty:
         return 0, ["El archivo no tiene movimientos válidos. "
                    "Asegúrate de que la columna Tipo diga 'Ingreso' o 'Gasto'."]
+
+    # Si modo reemplazar, eliminar movimientos del período antes de importar
+    if modo == "reemplazar" and (año or meses):
+        db_tmp = _db_mod()
+        with db_tmp.get_conn() as conn_tmp:
+            if año and meses:
+                placeholders = ",".join("?" * len(meses))
+                meses_str = [f"{m:02d}" for m in meses]
+                conn_tmp.execute(
+                    f"DELETE FROM movimientos WHERE nit_empresa=? "
+                    f"AND strftime('%Y', fecha)=? "
+                    f"AND strftime('%m', fecha) IN ({placeholders})",
+                    [nit_empresa, str(año)] + meses_str
+                )
+            elif año:
+                conn_tmp.execute(
+                    "DELETE FROM movimientos WHERE nit_empresa=? AND strftime('%Y', fecha)=?",
+                    [nit_empresa, str(año)]
+                )
 
     db = _db_mod()
     importados = 0
@@ -1829,6 +1852,61 @@ def show():
         st.divider()
         st.markdown("#### Paso 3 — Sube el archivo lleno")
 
+        # ── Modo de importación ──
+        st.markdown("#### Modo de importación")
+        modo_imp = st.radio(
+            "¿Qué quieres hacer con los movimientos del archivo?",
+            ["Agregar (suma a los existentes)", "Reemplazar por período (borra y reimporta)"],
+            key="modo_importar",
+            help="Usa Reemplazar si ya importaste este período antes y quieres actualizarlo."
+        )
+        modo = "agregar" if "Agregar" in modo_imp else "reemplazar"
+
+        año_imp, meses_imp = None, None
+        if modo == "reemplazar":
+            st.markdown(
+                "<p style='color:#7B9BB5;font-size:.85rem'>"
+                "Selecciona el período que quieres reemplazar:</p>",
+                unsafe_allow_html=True
+            )
+            c1, c2 = st.columns(2)
+            with c1:
+                año_imp = st.selectbox("Año", [2024, 2025, 2026], index=2, key="imp_año")
+            with c2:
+                periodos_map = {
+                    "Enero":      [1],  "Febrero":   [2],  "Marzo":     [3],
+                    "Abril":      [4],  "Mayo":      [5],  "Junio":     [6],
+                    "Julio":      [7],  "Agosto":    [8],  "Septiembre":[9],
+                    "Octubre":   [10],  "Noviembre": [11], "Diciembre": [12],
+                    "Ene - Mar":  [1,2,3],    "Abr - Jun": [4,5,6],
+                    "Jul - Sep":  [7,8,9],    "Oct - Dic": [10,11,12],
+                    "Año completo": list(range(1,13)),
+                }
+                periodo_sel = st.selectbox("Período a reemplazar", list(periodos_map.keys()),
+                                           key="imp_periodo")
+                meses_imp = periodos_map[periodo_sel]
+
+            total_a_borrar = 0
+            if año_imp and meses_imp:
+                try:
+                    db_check = _db_mod()
+                    meses_str = [f"{m:02d}" for m in meses_imp]
+                    ph = ",".join("?" * len(meses_str))
+                    with db_check.get_conn() as conn_c:
+                        total_a_borrar = conn_c.execute(
+                            f"SELECT COUNT(*) FROM movimientos WHERE nit_empresa=? "
+                            f"AND strftime('%Y',fecha)=? AND strftime('%m',fecha) IN ({ph})",
+                            [_nit(), str(año_imp)] + meses_str
+                        ).fetchone()[0]
+                except Exception:
+                    pass
+            if total_a_borrar > 0:
+                st.warning(
+                    f"Se eliminarán {total_a_borrar} movimientos de {periodo_sel} {año_imp} "
+                    f"antes de importar el archivo."
+                )
+
+        st.divider()
         archivo_imp = st.file_uploader(
             "Selecciona el archivo Excel con tus movimientos",
             type=["xlsx","xls"],
@@ -1846,22 +1924,21 @@ def show():
             except Exception as ex:
                 st.warning(f"No se pudo previsualizar: {ex}")
 
-            c1, c2 = st.columns([1, 3])
-            with c1:
-                confirmar = st.button("Importar movimientos", type="primary", key="btn_imp_v2")
-            with c2:
-                st.markdown(
-                    "<p style='color:#7B9BB5;padding-top:.6rem'>"
-                    "Los movimientos se agregan a tu contabilidad actual.</p>",
-                    unsafe_allow_html=True
-                )
+            label_btn = "Importar movimientos" if modo == "agregar" else f"Reemplazar {periodo_sel if modo=='reemplazar' else ''} e importar"
+            confirmar = st.button(label_btn, type="primary", key="btn_imp_v2")
 
             if confirmar:
                 with st.spinner("Procesando archivo..."):
                     archivo_imp.seek(0)
-                    importados, errores = _importar_desde_excel(archivo_imp, _nit())
+                    importados, errores = _importar_desde_excel(
+                        archivo_imp, _nit(),
+                        modo=modo,
+                        año=año_imp,
+                        meses=meses_imp
+                    )
                 if importados > 0:
-                    st.success(f"Se importaron {importados} movimientos exitosamente.")
+                    accion = "reemplazados e importados" if modo == "reemplazar" else "importados"
+                    st.success(f"Se {accion} {importados} movimientos exitosamente.")
                 if errores:
                     st.warning(f"Se encontraron {len(errores)} advertencias:")
                     with st.expander("Ver detalle"):
