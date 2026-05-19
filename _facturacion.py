@@ -294,6 +294,145 @@ def _btn_descarga_pdf(pdf_bytes, num_factura, label="⬇️ Descargar Factura PD
 # MAIN
 # ─────────────────────────────────────────────
 
+# ─────────────────────────────────────────────
+# PDF TIQUETE POS
+# ─────────────────────────────────────────────
+
+def generar_pdf_pos(pos_data: dict) -> bytes:
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.units import inch, mm
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+
+        buffer = io.BytesIO()
+        # Ancho tiquete POS: 80mm
+        ancho  = 80 * mm
+        alto   = 297 * mm
+        doc = SimpleDocTemplate(buffer, pagesize=(ancho, alto),
+                                rightMargin=4*mm, leftMargin=4*mm,
+                                topMargin=6*mm, bottomMargin=6*mm)
+
+        COLOR_DARK = colors.HexColor("#0D1B2A")
+        COLOR_CYAN = colors.HexColor("#00C2FF")
+        COLOR_GRAY = colors.HexColor("#7B9BB5")
+
+        s_titulo  = ParagraphStyle("t", fontSize=11, fontName="Helvetica-Bold",
+                                   alignment=TA_CENTER, textColor=COLOR_DARK, spaceAfter=2)
+        s_sub     = ParagraphStyle("s", fontSize=7,  fontName="Helvetica",
+                                   alignment=TA_CENTER, textColor=COLOR_GRAY, spaceAfter=1)
+        s_normal  = ParagraphStyle("n", fontSize=8,  fontName="Helvetica",
+                                   alignment=TA_LEFT,   textColor=COLOR_DARK, spaceAfter=1)
+        s_right   = ParagraphStyle("r", fontSize=8,  fontName="Helvetica",
+                                   alignment=TA_RIGHT,  textColor=COLOR_DARK)
+        s_total   = ParagraphStyle("to", fontSize=11, fontName="Helvetica-Bold",
+                                   alignment=TA_RIGHT,  textColor=COLOR_CYAN)
+        s_footer  = ParagraphStyle("f", fontSize=6.5, fontName="Helvetica",
+                                   alignment=TA_CENTER, textColor=COLOR_GRAY)
+
+        story = []
+        col_w = ancho - 8*mm
+
+        # Encabezado empresa
+        story.append(Paragraph(pos_data.get("empresa_nombre","Mi Empresa"), s_titulo))
+        if pos_data.get("empresa_nit"):
+            story.append(Paragraph(f"NIT: {pos_data['empresa_nit']}", s_sub))
+        if pos_data.get("empresa_direccion"):
+            story.append(Paragraph(pos_data["empresa_direccion"], s_sub))
+        if pos_data.get("empresa_telefono"):
+            story.append(Paragraph(f"Tel: {pos_data['empresa_telefono']}", s_sub))
+        story.append(Spacer(1, 2*mm))
+        story.append(HRFlowable(width="100%", thickness=1, color=COLOR_CYAN))
+        story.append(Spacer(1, 1*mm))
+
+        # Número y fecha
+        story.append(Paragraph(f"TIQUETE POS No. {pos_data['numero']}", s_titulo))
+        story.append(Paragraph(str(pos_data["fecha"]), s_sub))
+        if pos_data.get("cajero"):
+            story.append(Paragraph(f"Cajero: {pos_data['cajero']}", s_sub))
+        story.append(Spacer(1, 2*mm))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=COLOR_GRAY))
+        story.append(Spacer(1, 1*mm))
+
+        # Items
+        for item in pos_data["items"]:
+            total_item = item["cantidad"] * item["precio"]
+            fila = [
+                [Paragraph(item["descripcion"], s_normal)],
+                [Paragraph(
+                    f"{item['cantidad']} x ${item['precio']:,.0f} = ${total_item:,.0f}",
+                    s_right
+                )]
+            ]
+            t = Table(fila, colWidths=[col_w])
+            t.setStyle(TableStyle([
+                ("TOPPADDING",    (0,0),(-1,-1), 1),
+                ("BOTTOMPADDING", (0,0),(-1,-1), 1),
+            ]))
+            story.append(t)
+
+        story.append(Spacer(1, 2*mm))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=COLOR_GRAY))
+        story.append(Spacer(1, 1*mm))
+
+        # Totales
+        subtotal  = sum(i["cantidad"] * i["precio"] for i in pos_data["items"])
+        total_iva = sum(i["cantidad"] * i["precio"] * i.get("iva",0) / 100 for i in pos_data["items"])
+        total     = subtotal + total_iva
+
+        totales = [
+            ("Subtotal:",  f"${subtotal:,.0f}"),
+            ("IVA:",       f"${total_iva:,.0f}"),
+        ]
+        for label, val in totales:
+            t2 = Table([[Paragraph(label, s_normal), Paragraph(val, s_right)]],
+                       colWidths=[col_w*0.55, col_w*0.45])
+            t2.setStyle(TableStyle([
+                ("TOPPADDING",    (0,0),(-1,-1), 1),
+                ("BOTTOMPADDING", (0,0),(-1,-1), 1),
+            ]))
+            story.append(t2)
+
+        story.append(HRFlowable(width="100%", thickness=1.5, color=COLOR_CYAN))
+        t3 = Table([[Paragraph("TOTAL:", s_total), Paragraph(f"${total:,.0f}", s_total)]],
+                   colWidths=[col_w*0.5, col_w*0.5])
+        story.append(t3)
+
+        # Pago y vuelto
+        if pos_data.get("pago_recibido") and pos_data["pago_recibido"] >= total:
+            vuelto = pos_data["pago_recibido"] - total
+            story.append(Spacer(1, 2*mm))
+            t4 = Table([
+                [Paragraph("Recibido:", s_normal), Paragraph(f"${pos_data['pago_recibido']:,.0f}", s_right)],
+                [Paragraph("Vuelto:",   s_normal), Paragraph(f"${vuelto:,.0f}", s_right)],
+            ], colWidths=[col_w*0.55, col_w*0.45])
+            story.append(t4)
+
+        # Forma de pago
+        if pos_data.get("forma_pago"):
+            story.append(Spacer(1, 1*mm))
+            story.append(Paragraph(f"Pago: {pos_data['forma_pago']}", s_sub))
+
+        story.append(Spacer(1, 3*mm))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=COLOR_GRAY))
+        story.append(Spacer(1, 2*mm))
+
+        # Mensaje y footer
+        msg = pos_data.get("mensaje", "¡Gracias por su compra!")
+        story.append(Paragraph(msg, ParagraphStyle("msg", fontSize=8, fontName="Helvetica-Bold",
+                                                    alignment=TA_CENTER, textColor=COLOR_CYAN)))
+        story.append(Spacer(1, 1*mm))
+        story.append(Paragraph("Generado por SalazAnalytics · salazanalytics.com", s_footer))
+
+        doc.build(story)
+        buffer.seek(0)
+        return buffer.getvalue()
+    except ImportError:
+        return None
+
+
 def show():
     _init_state()
 
@@ -305,8 +444,8 @@ def show():
         unsafe_allow_html=True
     )
 
-    tab_agente, tab1, tab2, tab3 = st.tabs([
-        "🤖 Agente IA", "📝 Nueva Factura", "📂 Historial", "⚙️ Mi Empresa"
+    tab_agente, tab1, tab_pos, tab2, tab3 = st.tabs([
+        "🤖 Agente IA", "📝 Nueva Factura", "🧾 Tiquete POS", "📂 Historial", "⚙️ Mi Empresa"
     ])
 
     # ══════════════════════════════════════════
@@ -616,6 +755,132 @@ def show():
                     st.session_state["items_factura"] = []
                 else:
                     st.error("Error generando PDF. Verifica que reportlab esté instalado.")
+
+    # ══════════════════════════════════════════
+    # TAB TIQUETE POS
+    # ══════════════════════════════════════════
+    with tab_pos:
+        st.markdown("### 🧾 Tiquete POS")
+        st.markdown(
+            "<p style='color:#7B9BB5'>Genera tiquetes de caja rápidos para ventas al detal. "
+            "Formato 80mm ideal para impresora POS.</p>",
+            unsafe_allow_html=True
+        )
+
+        # Items POS en session_state
+        if "items_pos" not in st.session_state:
+            st.session_state["items_pos"] = []
+
+        # ── Datos del tiquete ──
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            num_pos    = st.text_input("N° tiquete",
+                          value=f"POS-{datetime.now().strftime('%Y%m%d')}-{len(st.session_state.get('facturas',[])) + 1:03d}",
+                          key="pos_num")
+        with c2:
+            cajero_pos = st.text_input("Cajero (opcional)", key="pos_cajero")
+        with c3:
+            forma_pago = st.selectbox("Forma de pago",
+                          ["Efectivo","Tarjeta débito","Tarjeta crédito","Transferencia","Nequi/Daviplata"],
+                          key="pos_forma_pago")
+
+        st.divider()
+        st.markdown("#### Agregar productos")
+
+        c1, c2, c3, c4 = st.columns([3, 1, 1.5, 1])
+        with c1:
+            pos_desc  = st.text_input("Producto/servicio", key="pos_desc")
+        with c2:
+            pos_cant  = st.number_input("Cant.", min_value=1, value=1, key="pos_cant")
+        with c3:
+            pos_precio= st.number_input("Precio unit.", min_value=0, step=1000, key="pos_precio")
+        with c4:
+            pos_iva   = st.selectbox("IVA", [0, 5, 19], key="pos_iva")
+
+        if st.button("➕ Agregar", key="btn_pos_agregar"):
+            if pos_desc and pos_precio > 0:
+                st.session_state["items_pos"].append({
+                    "descripcion": st.session_state["pos_desc"],
+                    "cantidad":    st.session_state["pos_cant"],
+                    "precio":      st.session_state["pos_precio"],
+                    "iva":         st.session_state["pos_iva"],
+                })
+                st.rerun()
+            else:
+                st.warning("Ingresa descripción y precio.")
+
+        # ── Items agregados ──
+        if st.session_state["items_pos"]:
+            st.markdown("**Items:**")
+            for i, item in enumerate(st.session_state["items_pos"]):
+                total_item = item["cantidad"] * item["precio"]
+                ca, cb, cc = st.columns([4, 2, 1])
+                ca.markdown(f"**{item['descripcion']}** × {item['cantidad']}")
+                cb.markdown(f"${total_item:,.0f}")
+                if cc.button("🗑️", key=f"del_pos_{i}"):
+                    st.session_state["items_pos"].pop(i)
+                    st.rerun()
+
+            subtotal_pos  = sum(i["cantidad"] * i["precio"] for i in st.session_state["items_pos"])
+            total_iva_pos = sum(i["cantidad"] * i["precio"] * i["iva"] / 100 for i in st.session_state["items_pos"])
+            total_pos     = subtotal_pos + total_iva_pos
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Subtotal", f"${subtotal_pos:,.0f}")
+            c2.metric("IVA",      f"${total_iva_pos:,.0f}")
+            c3.metric("TOTAL",    f"${total_pos:,.0f}")
+
+            st.divider()
+
+            # Pago y vuelto
+            c1, c2 = st.columns(2)
+            with c1:
+                pago_recibido = st.number_input("Pago recibido ($)",
+                                 min_value=0, step=1000,
+                                 value=int(total_pos), key="pos_pago")
+            with c2:
+                vuelto = max(pago_recibido - total_pos, 0)
+                st.metric("Vuelto", f"${vuelto:,.0f}")
+
+            mensaje_pos = st.text_input("Mensaje en el tiquete",
+                           value="Gracias por su compra!", key="pos_mensaje")
+
+            if st.button("🖨️ Generar Tiquete POS", type="primary", key="btn_gen_pos"):
+                pos_data = {
+                    "numero":            num_pos,
+                    "fecha":             date.today(),
+                    "empresa_nombre":    st.session_state.get("emp_nombre", "Mi Empresa"),
+                    "empresa_nit":       st.session_state.get("emp_nit", ""),
+                    "empresa_direccion": st.session_state.get("emp_dir", ""),
+                    "empresa_telefono":  st.session_state.get("emp_tel", ""),
+                    "cajero":            cajero_pos,
+                    "forma_pago":        forma_pago,
+                    "pago_recibido":     pago_recibido,
+                    "items":             st.session_state["items_pos"].copy(),
+                    "mensaje":           mensaje_pos,
+                }
+                with st.spinner("Generando tiquete..."):
+                    pdf_bytes = generar_pdf_pos(pos_data)
+
+                if pdf_bytes:
+                    b64 = base64.b64encode(pdf_bytes).decode()
+                    href = (
+                        f'<a href="data:application/pdf;base64,{b64}" '
+                        f'download="tiquete_{num_pos}.pdf" '
+                        f'style="display:inline-block;background:#00C2FF;color:#0D1B2A;'
+                        f'font-weight:700;padding:.7rem 1.5rem;border-radius:8px;'
+                        f'text-decoration:none;font-size:1rem;">'
+                        f'🖨️ Descargar Tiquete PDF</a>'
+                    )
+                    st.markdown(href, unsafe_allow_html=True)
+                    st.success(f"Tiquete {num_pos} generado — Total: ${total_pos:,.0f}")
+                    st.session_state["items_pos"] = []
+                else:
+                    st.error("Error generando el tiquete. Verifica que reportlab esté instalado.")
+
+            if st.button("🗑️ Limpiar items", key="btn_pos_limpiar"):
+                st.session_state["items_pos"] = []
+                st.rerun()
 
     # ══════════════════════════════════════════
     # TAB HISTORIAL
