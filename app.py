@@ -292,7 +292,7 @@ def app_principal():
     elif "Flujo"        in page: load_module("flujo_caja",     base/"_flujo_caja.py").show()
     elif "Contabilidad" in page: load_module("contabilidad",   base/"_contabilidad.py").show()
     elif "Indirecto"    in page: load_module("flujo_indirecto", base/"_flujo_indirecto.py").show()
-    elif "Nómina" in page: load_module("simulador_nomina", base/"_simulador_nomina.py").show()
+    elif "Nómina"       in page: load_module("simulador_nomina", base/"_simulador_nomina.py").show()
     elif "Mi Empresa"   in page: pantalla_mi_empresa()
 
 if not st.session_state.get("logged_in"):
