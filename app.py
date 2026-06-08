@@ -268,7 +268,7 @@ def app_principal():
             "📊 Dashboards Financieros", "📗 Auditoria de Excel",
             "💬 Consultor Contable IA", "⚙️ Automatizacion n8n",
             "🔍 Anomalias", "📑 Exportar", "🧾 Facturacion",
-            "📒 Contabilidad", "🏢 Mi Empresa",
+            "📒 Contabilidad", "💰 Flujo de Caja", "🏢 Mi Empresa",
         ], label_visibility="collapsed", key="pagina_actual")
 
         st.divider()
@@ -288,6 +288,7 @@ def app_principal():
     elif "Anomalias"    in page: load_module("anomalias",      base/"_anomalias.py").show()
     elif "Exportar"     in page: load_module("exportar",       base/"_exportar.py").show()
     elif "Factura"      in page: load_module("facturacion",    base/"_facturacion.py").show()
+    elif "Flujo"        in page: load_module("flujo_caja",     base/"_flujo_caja.py").show()
     elif "Contabilidad" in page: load_module("contabilidad",   base/"_contabilidad.py").show()
     elif "Mi Empresa"   in page: pantalla_mi_empresa()
 
