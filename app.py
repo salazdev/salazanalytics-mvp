@@ -224,6 +224,24 @@ def pantalla_mi_empresa():
 # ─────────────────────────────────────────────
 # APP PRINCIPAL
 # ─────────────────────────────────────────────
+# En el radio del menú, agrega:
+"💰 Flujo de Caja",
+
+# En los elif del router:
+# Router — agrega antes del elif "Mi Empresa":
+elif "Flujo"        in page: load_module("flujo_caja",     base/"_flujo_caja.py").show()
+elif "Mi Empresa"   in page: pantalla_mi_empresa()
+
+elif "Flujo" in page: load_module("flujo_caja", base/"_flujo_caja.py").show()
+# Radio del menú — agrega la línea nueva:
+page = st.radio("Menu", [
+    "🏠 Inicio", "⚖️ Revisoria y Cumplimiento", "🔮 Mirofish Predictor",
+    "📊 Dashboards Financieros", "📗 Auditoria de Excel",
+    "💬 Consultor Contable IA", "⚙️ Automatizacion n8n",
+    "🔍 Anomalias", "📑 Exportar", "🧾 Facturacion",
+    "📒 Contabilidad", "💰 Flujo de Caja",   # ← nueva línea
+    "🏢 Mi Empresa",
+], label_visibility="collapsed", key="pagina_actual")
 
 def app_principal():
     base    = Path(__file__).parent
