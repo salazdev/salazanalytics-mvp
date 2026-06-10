@@ -1,552 +1,382 @@
 """
 _diagnostico_niif.py — SalazAnalytics
-Micro-activo: Diagnóstico NIIF Pymes
-Clasificación Grupo 2 / Grupo 3 · Checklist · Semáforo · Reporte
+Módulo: 🏛️ Diagnóstico NIIF Pymes — rediseño wizard simplificado
+10 áreas · respuesta Sí / En proceso / No · semáforo en tiempo real
 """
 import streamlit as st
-import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 from io import BytesIO
-import warnings
-warnings.filterwarnings("ignore")
 
-# ── Paleta ────────────────────────────────────────────────────────────────────
+# ── Paleta ─────────────────────────────────────────────────────────────────
 BG_DARK  = "#0D1B2A"; BG_CARD = "#132030"; BORDER = "#1a3a5c"
 TEXT_SEC = "#7B9BB5"; ACCENT  = "#00C2FF"; DANGER = "#FF6B6B"
 SUCCESS  = "#00FFB3"; WARN    = "#FFD93D"; PURPLE = "#7B2FBE"
 
 SMMLV_2026 = 1_750_905
 
-# ── Checklist Grupo 2 (NIIF para Pymes) ──────────────────────────────────────
-CHECKLIST_G2 = {
-    "📋 Políticas Contables": [
-        ("POL1", "Manual de políticas contables adoptado y aprobado por la dirección", "Alta"),
-        ("POL2", "Políticas comunicadas al equipo contable y financiero", "Media"),
-        ("POL3", "Fecha de transición a NIIF documentada", "Alta"),
-        ("POL4", "Políticas revisadas en los últimos 2 años", "Media"),
-    ],
-    "🏭 Propiedades, Planta y Equipo — Sec. 17": [
-        ("PPE1", "Vidas útiles revisadas y documentadas por clase de activo", "Alta"),
-        ("PPE2", "Método de depreciación definido (línea recta, unidades producción...)", "Alta"),
-        ("PPE3", "Valor residual estimado para cada clase", "Media"),
-        ("PPE4", "Evaluación de deterioro realizada anualmente", "Alta"),
-        ("PPE5", "Componentización de activos significativos aplicada", "Media"),
-        ("PPE6", "Propiedades de inversión identificadas y separadas", "Baja"),
-    ],
-    "📦 Inventarios — Sec. 13": [
-        ("INV1", "Método de costeo definido: FIFO o Promedio Ponderado", "Alta"),
-        ("INV2", "Valor Neto Realizable evaluado al cierre", "Alta"),
-        ("INV3", "Obsolescencia identificada y provisionada", "Media"),
-        ("INV4", "Conteos físicos periódicos con actas de inventario", "Media"),
-    ],
-    "💳 Instrumentos Financieros — Sec. 11/12": [
-        ("IF1", "Política de deterioro de cartera definida y documentada", "Alta"),
-        ("IF2", "Modelo de pérdidas crediticias esperadas aplicado (ECL)", "Alta"),
-        ("IF3", "Activos financieros clasificados correctamente", "Media"),
-        ("IF4", "Pasivos financieros medidos a costo amortizado", "Media"),
-        ("IF5", "Inversiones de capital clasificadas y medidas", "Baja"),
-    ],
-    "💰 Ingresos — Sec. 23": [
-        ("ING1", "Política de reconocimiento de ingresos documentada", "Alta"),
-        ("ING2", "Momento de reconocimiento definido (transferencia de riesgos/control)", "Alta"),
-        ("ING3", "Ingresos diferidos identificados y contabilizados", "Media"),
-        ("ING4", "Descuentos, devoluciones y rebajas registrados correctamente", "Media"),
-    ],
-    "🏢 Arrendamientos — Sec. 20": [
-        ("ARR1", "Contratos de arrendamiento clasificados (operativo vs. financiero)", "Media"),
-        ("ARR2", "Activos por derecho de uso reconocidos si aplica", "Media"),
-        ("ARR3", "Pagos mínimos futuros calculados y revelados", "Baja"),
-    ],
-    "👥 Beneficios a Empleados — Sec. 28": [
-        ("BEN1", "Cesantías, vacaciones e intereses provisionados correctamente", "Alta"),
-        ("BEN2", "Obligaciones post-empleo (pensiones) identificadas", "Media"),
-        ("BEN3", "Cálculo actuarial realizado si supera umbrales", "Media"),
-        ("BEN4", "Bonificaciones y comisiones causadas al corte", "Alta"),
-    ],
-    "🧾 Impuestos — Sec. 29": [
-        ("IMP1", "Impuesto diferido calculado (activo y pasivo)", "Alta"),
-        ("IMP2", "Diferencias temporarias entre base fiscal y contable identificadas", "Alta"),
-        ("IMP3", "Conciliación patrimonio fiscal vs. contable preparada", "Alta"),
-        ("IMP4", "Recoverabilidad del activo por impuesto diferido evaluada", "Media"),
-    ],
-    "📊 Estados Financieros — Sec. 3-8": [
-        ("EF1", "Estado de Situación Financiera (balance) bajo NIIF completo", "Alta"),
-        ("EF2", "Estado de Resultados Integral preparado", "Alta"),
-        ("EF3", "Estado de Cambios en Patrimonio preparado", "Alta"),
-        ("EF4", "Estado de Flujos de Efectivo — método indirecto", "Alta"),
-        ("EF5", "Presentados con período comparativo (año anterior)", "Alta"),
-    ],
-    "🔍 Revelaciones y Notas — Sec. 8": [
-        ("REV1", "Notas a EE.FF. completas con todas las secciones requeridas", "Alta"),
-        ("REV2", "Políticas contables significativas reveladas en notas", "Alta"),
-        ("REV3", "Juicios, estimaciones e incertidumbres documentados", "Media"),
-        ("REV4", "Partes relacionadas identificadas y transacciones reveladas", "Media"),
-        ("REV5", "Compromisos, contingencias y hechos posteriores revelados", "Media"),
-    ],
-}
-
-CHECKLIST_G3 = {
-    "📋 Documentación Básica": [
-        ("G3P1", "Libro fiscal actualizado y firmado", "Alta"),
-        ("G3P2", "Políticas contables simplificadas documentadas", "Media"),
-        ("G3P3", "Soportes de cada transacción archivados", "Alta"),
-    ],
-    "🏭 Activos": [
-        ("G3A1", "Registro de activos fijos con valor de adquisición y depreciación acumulada", "Alta"),
-        ("G3A2", "Inventario de existencias valorado al costo", "Alta"),
-        ("G3A3", "Cuentas por cobrar identificadas y con soporte", "Alta"),
-    ],
-    "💼 Pasivos": [
-        ("G3P4", "Cuentas por pagar a proveedores registradas al corte", "Alta"),
-        ("G3P5", "Obligaciones financieras con saldo actualizado", "Alta"),
-        ("G3P6", "Obligaciones laborales causadas (vacaciones, cesantías)", "Alta"),
-    ],
-    "💰 Ingresos y Gastos": [
-        ("G3I1", "Ingresos registrados cuando se realiza la venta/servicio", "Alta"),
-        ("G3I2", "Gastos causados en el período correspondiente", "Alta"),
-        ("G3I3", "Costos de ventas calculados correctamente", "Alta"),
-    ],
-    "📊 Reportes Requeridos": [
-        ("G3R1", "Balance de comprobación mensual preparado", "Alta"),
-        ("G3R2", "Estado de resultados simplificado disponible", "Alta"),
-        ("G3R3", "Declaraciones tributarias conciliadas con contabilidad", "Alta"),
-    ],
-}
-
-OBLIGACIONES_TRIBUTARIAS = [
-    ("RET", "Agente de Retención en la Fuente",
-     "Patrimonio bruto > $4,786M o ingresos brutos > $1,532M en año anterior, o es SA/SAS/Ltda.",
-     "Declaración mensual de retenciones"),
-    ("IVA", "Responsable de IVA (Régimen Común)",
-     "Ingresos brutos anuales > $119M (48 UVT × $2,483 aprox.) o tiene más de un local",
-     "Declaración bimestral o cuatrimestral según ingresos"),
-    ("ICA", "Impuesto de Industria y Comercio",
-     "Realiza actividades industriales, comerciales o de servicios en el municipio",
-     "Declaración bimestral o anual según municipio"),
-    ("RENTA", "Declaración de Renta",
-     "Persona jurídica: siempre. Persona natural: ingresos > 1,400 UVT (~$57M) o patrimonio > 4,500 UVT",
-     "Declaración anual — vence según último dígito NIT"),
-    ("SIMPLE", "Régimen SIMPLE de Tributación",
-     "Opcional para personas naturales y jurídicas con ingresos < $3,486M (1,400 UVT × 6 aprox.)",
-     "Anticipo bimestral + declaración anual"),
+# ── 10 áreas de diagnóstico ────────────────────────────────────────────────
+AREAS = [
+    {
+        "id": "politicas",
+        "titulo": "📋 Políticas Contables",
+        "pregunta": "¿Tu empresa tiene un manual de políticas contables escrito, aprobado y aplicado por el equipo?",
+        "si":       "Manual documentado, socializado y actualizado en los últimos 2 años.",
+        "proceso":  "Existe un borrador o se aplican políticas de manera informal.",
+        "no":       "No hay manual ni políticas formalmente definidas.",
+        "accion":   "Elaborar el manual de políticas contables adaptado a tu sector y marco NIIF.",
+    },
+    {
+        "id": "ppe",
+        "titulo": "🏭 Propiedades, Planta y Equipo",
+        "pregunta": "¿Los activos fijos tienen vida útil, valor residual y depreciación calculados bajo NIIF (no la tabla fiscal)?",
+        "si":       "Vidas útiles técnicas definidas, depreciación calculada y deterioro evaluado anualmente.",
+        "proceso":  "Algunos activos están ajustados; otros aún usan tasas fiscales.",
+        "no":       "Se deprecia con las tasas del Estatuto Tributario sin ajuste contable.",
+        "accion":   "Revisar y ajustar vidas útiles, valores residuales y depreciación de todos los activos fijos.",
+    },
+    {
+        "id": "inventarios",
+        "titulo": "📦 Inventarios",
+        "pregunta": "¿El inventario se valora al costo (FIFO o Promedio) y se evalúa si hay ítems por debajo del Valor Neto Realizable?",
+        "si":       "Método de costeo definido, conteos físicos periódicos y VNR evaluado al cierre.",
+        "proceso":  "Se tienen conteos pero no se evalúa el VNR ni se revisan obsolescencias.",
+        "no":       "No hay método de costeo claro ni evaluación de inventario obsoleto.",
+        "accion":   "Establecer método de costeo, rutina de conteos físicos y evaluación de VNR al cierre.",
+    },
+    {
+        "id": "cartera",
+        "titulo": "💳 Cartera y Provisiones",
+        "pregunta": "¿Se analiza la cartera con criterios NIIF para estimar pérdidas crediticias (más allá de la provisión fiscal del 33%)?",
+        "si":       "Modelo de deterioro basado en experiencia histórica y análisis por cliente.",
+        "proceso":  "Se hace algún análisis pero no está documentado ni es sistemático.",
+        "no":       "Solo se aplica la provisión fiscal del 33% para cartera mayor a 1 año.",
+        "accion":   "Implementar matriz de provisión por antigüedad de cartera calibrada con datos históricos.",
+    },
+    {
+        "id": "ingresos",
+        "titulo": "💰 Reconocimiento de Ingresos",
+        "pregunta": "¿Los ingresos se registran cuando se transfieren los riesgos al cliente (no cuando se cobra)?",
+        "si":       "Ingresos causados al momento de entrega del bien o prestación del servicio.",
+        "proceso":  "Se causa la mayoría pero hay casos de registro al cobro o al facturar.",
+        "no":       "Los ingresos se registran cuando se recibe el pago (base caja).",
+        "accion":   "Documentar política de reconocimiento de ingresos y ajustar el proceso contable.",
+    },
+    {
+        "id": "pasivos",
+        "titulo": "👥 Pasivos Laborales",
+        "pregunta": "¿Las prestaciones sociales (cesantías, vacaciones, primas, intereses) se causan mensualmente?",
+        "si":       "Causación mensual de todas las prestaciones; vacaciones provisionadas por días causados.",
+        "proceso":  "Se causan algunas prestaciones mensualmente; otras solo en las fechas de pago.",
+        "no":       "Las prestaciones se registran únicamente cuando se pagan (enero, junio, diciembre).",
+        "accion":   "Implementar causación mensual de prestaciones. Usar el Simulador de Nómina de SalazAnalytics.",
+    },
+    {
+        "id": "impuestos",
+        "titulo": "🧾 Impuesto Diferido",
+        "pregunta": "¿Se calcula el impuesto diferido por diferencias entre la base contable NIIF y la base fiscal?",
+        "si":       "Impuesto diferido calculado, con conciliación patrimonio fiscal vs. contable.",
+        "proceso":  "Se conoce el concepto pero el cálculo no está implementado formalmente.",
+        "no":       "Solo se registra el impuesto corriente (lo que dice la declaración de renta).",
+        "accion":   "Calcular diferencias temporarias y reconocer activos/pasivos por impuesto diferido.",
+    },
+    {
+        "id": "eeff",
+        "titulo": "📊 Estados Financieros",
+        "pregunta": "¿Se presentan los 4 estados financieros completos bajo NIIF con período comparativo?",
+        "si":       "Balance, P&G, Cambios en Patrimonio y Flujo de Efectivo con año anterior comparativo.",
+        "proceso":  "Se preparan algunos estados pero sin todos los comparativos o sin el flujo de efectivo.",
+        "no":       "Solo se prepara balance y estado de resultados, sin comparativos ni flujo de efectivo.",
+        "accion":   "Completar el juego de estados financieros. Usar el módulo de Flujo Indirecto de SalazAnalytics.",
+    },
+    {
+        "id": "notas",
+        "titulo": "🔍 Notas y Revelaciones",
+        "pregunta": "¿Las notas a los estados financieros detallan políticas, estimaciones, partes relacionadas y contingencias?",
+        "si":       "Notas completas con todas las secciones requeridas por NIIF para Pymes.",
+        "proceso":  "Hay notas básicas pero faltan revelaciones de partes relacionadas o contingencias.",
+        "no":       "No se preparan notas o son genéricas sin información específica de la empresa.",
+        "accion":   "Elaborar notas completas incluyendo partes relacionadas, contingencias y compromisos.",
+    },
+    {
+        "id": "auditoria",
+        "titulo": "🏛️ Auditoría y Entidades",
+        "pregunta": "¿Los estados financieros han sido revisados por un auditor o presentados a Supersociedades/SIC bajo NIIF?",
+        "si":       "Auditoría o revisión fiscal realizada bajo NIA; reportes a entidades al día.",
+        "proceso":  "Se ha hecho alguna revisión interna pero no auditoría formal ni reporte a entidades.",
+        "no":       "No se ha realizado auditoría ni se han presentado estados bajo NIIF a entidades de vigilancia.",
+        "accion":   "Contratar auditoría bajo NIA y presentar estados financieros NIIF a las entidades correspondientes.",
+    },
 ]
 
-# ── Utilidades ────────────────────────────────────────────────────────────────
-def card(titulo, valor, color=ACCENT, sub=""):
-    s = f"<p style='color:{TEXT_SEC};font-size:.72rem;margin:.15rem 0 0'>{sub}</p>" if sub else ""
-    return f"""<div style="background:{BG_CARD};border:1px solid {BORDER};border-radius:12px;
-        padding:.8rem 1rem;text-align:center;">
-        <p style="color:{TEXT_SEC};font-size:.73rem;margin:0 0 .2rem">{titulo}</p>
-        <p style="color:{color};font-weight:700;font-size:1.3rem;margin:0">{valor}</p>{s}</div>"""
+OPCIONES    = ["❓ Sin evaluar", "✅ Sí cumple", "⚠️ En proceso", "❌ No cumple"]
+OP_COLORES  = {"✅ Sí cumple": SUCCESS, "⚠️ En proceso": WARN,
+               "❌ No cumple": DANGER, "❓ Sin evaluar": TEXT_SEC}
+OP_SCORES   = {"✅ Sí cumple": 100, "⚠️ En proceso": 50,
+               "❌ No cumple": 0,   "❓ Sin evaluar": None}
 
-def badge(texto, color):
-    return f"<span style='background:{color}22;color:{color};border:1px solid {color}55;border-radius:20px;padding:2px 10px;font-size:.78rem;font-weight:600'>{texto}</span>"
+SMMLV_2026 = 1_750_905
 
-def semaforo_color(pct):
+def semaforo(pct):
     if pct >= 75: return SUCCESS, "🟢 Bueno"
     if pct >= 50: return WARN,    "🟡 En proceso"
-    return DANGER, "🔴 Requiere atención"
+    return DANGER,  "🔴 Requiere atención"
 
-def get_checklist(grupo):
-    return CHECKLIST_G2 if grupo == 2 else CHECKLIST_G3
+def barra_html(pct, color):
+    return (f"<div style='background:{BORDER};border-radius:20px;height:10px;width:100%'>"
+            f"<div style='background:{color};width:{pct:.0f}%;height:10px;border-radius:20px;"
+            f"transition:width .4s'></div></div>")
 
-# ── FUNCIÓN PRINCIPAL ─────────────────────────────────────────────────────────
+# ── FUNCIÓN PRINCIPAL ──────────────────────────────────────────────────────
 def show():
     st.markdown("## 🏛️ Diagnóstico NIIF Pymes")
-    st.markdown(f"<p style='color:{TEXT_SEC}'>Evalúa el nivel de cumplimiento de tu empresa con las Normas Internacionales de Información Financiera.</p>",
-                unsafe_allow_html=True)
+    st.markdown(
+        f"<p style='color:{TEXT_SEC}'>Responde 10 preguntas sobre tu empresa y obtén tu nivel de cumplimiento NIIF "
+        f"con un plan de acción priorizado.</p>", unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🏢 Mi Empresa",
-        "✅ Checklist NIIF",
-        "🚦 Semáforo",
-        "📌 Recomendaciones",
-        "📄 Reporte",
-    ])
+    tab1, tab2 = st.tabs(["📋 Diagnóstico", "📄 Reporte"])
 
     # ═══════════════════════════════════════════════════════════
-    # TAB 1 — MI EMPRESA
+    # TAB 1 — DIAGNÓSTICO
     # ═══════════════════════════════════════════════════════════
     with tab1:
-        st.markdown("### 🏢 Información de la empresa")
-        st.markdown(f"<p style='color:{TEXT_SEC};font-size:.85rem'>Completa estos datos para clasificar tu empresa y determinar tus obligaciones.</p>",
-                    unsafe_allow_html=True)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            nombre_emp = st.text_input("Nombre de la empresa", key="niif_nombre",
-                                       placeholder="Ej: Comercializadora XYZ S.A.S.")
-            tipo_persona = st.selectbox("Tipo de persona", ["Jurídica (Empresa)", "Natural (Comerciante)"], key="niif_tipo")
-            sector = st.selectbox("Sector económico", [
-                "Comercio", "Servicios", "Manufactura / Industrial",
-                "Construcción", "Agropecuario", "Tecnología", "Salud", "Otro"
-            ], key="niif_sector")
-        with col2:
-            empleados = st.number_input("Número de empleados", min_value=0, max_value=10000,
-                                        value=15, step=1, key="niif_emp")
-            activos_m = st.number_input("Activos totales (millones COP)", min_value=0.0,
-                                        value=500.0, step=50.0, key="niif_activos",
-                                        help="Suma de todos los activos del balance")
-            ingresos_m = st.number_input("Ingresos brutos anuales (millones COP)", min_value=0.0,
-                                         value=800.0, step=50.0, key="niif_ingresos",
-                                         help="Ingresos brutos del último año fiscal")
-
-        activos_smmlv  = (activos_m  * 1_000_000) / SMMLV_2026
-        ingresos_smmlv = (ingresos_m * 1_000_000) / SMMLV_2026
-
-        # Clasificación automática
-        es_g3 = empleados <= 10 and activos_smmlv <= 500
-        grupo = 3 if es_g3 else (1 if (activos_smmlv > 30000 or ingresos_smmlv > 30000) else 2)
+        # Info empresa
+        col1, col2 = st.columns([2, 1])
+        nombre_emp = col1.text_input("Nombre de la empresa", key="nd_nombre",
+                                     placeholder="Ej: Comercializadora XYZ S.A.S.")
+        grupo = col2.selectbox("Marco contable", ["Grupo 2 — NIIF Pymes", "Grupo 3 — Simplificado"],
+                               key="nd_grupo")
 
         st.markdown("---")
-        st.markdown("#### 📌 Clasificación automática")
 
-        g_color = {1: DANGER, 2: ACCENT, 3: SUCCESS}[grupo]
-        g_label = {
-            1: "Grupo 1 — NIIF Plenas",
-            2: "Grupo 2 — NIIF para Pymes",
-            3: "Grupo 3 — Contabilidad Simplificada"
-        }[grupo]
-        g_desc = {
-            1: "Aplican las NIIF completas (IASB). Requiere contador público con tarjeta profesional y revisoría fiscal.",
-            2: "Aplica la NIIF para Pymes (IASB 2015 actualizada). Marco más completo con secciones específicas.",
-            3: "Marco simplificado (Decreto 2420 Anexo 3). Contabilidad de base cash simplificada."
-        }[grupo]
+        # ── Preguntas + semáforo en tiempo real ────────────────
+        scores = []
+        pendientes = []
 
-        st.markdown(f"""<div style="background:{BG_CARD};border-left:5px solid {g_color};
-            border-radius:8px;padding:1rem 1.2rem;margin-bottom:1rem">
-            <p style="color:{g_color};font-weight:700;font-size:1.1rem;margin:0 0 .3rem">{g_label}</p>
-            <p style="color:{TEXT_SEC};font-size:.87rem;margin:0">{g_desc}</p>
-            </div>""", unsafe_allow_html=True)
+        for area in AREAS:
+            val = st.session_state.get(f"nd_{area['id']}", "❓ Sin evaluar")
+            score = OP_SCORES[val]
+            if score is not None:
+                scores.append(score)
+            color = OP_COLORES[val]
 
-        c1, c2, c3 = st.columns(3)
-        c1.markdown(card("Empleados", str(empleados), ACCENT), unsafe_allow_html=True)
-        c2.markdown(card("Activos", f"{activos_smmlv:,.0f} SMMLV", g_color, f"${activos_m:,.0f}M COP"), unsafe_allow_html=True)
-        c3.markdown(card("Ingresos", f"{ingresos_smmlv:,.0f} SMMLV", g_color, f"${ingresos_m:,.0f}M COP"), unsafe_allow_html=True)
+            with st.container():
+                c_titulo, c_estado = st.columns([4, 1])
 
-        st.session_state["niif_grupo"] = grupo
+                # Barra de progreso del área
+                pct_area = score if score is not None else 0
+                bar_color = color if val != "❓ Sin evaluar" else BORDER
 
-        # Obligaciones tributarias
-        st.markdown("---")
-        st.markdown("#### 🧾 Obligaciones tributarias aplicables")
-        st.markdown(f"<p style='color:{TEXT_SEC};font-size:.83rem'>Marca las que aplican a tu empresa para incluirlas en el reporte.</p>",
+                c_titulo.markdown(
+                    f"<p style='color:#E8F4FD;font-weight:600;font-size:.93rem;margin:0 0 .1rem'>"
+                    f"{area['titulo']}</p>"
+                    f"<p style='color:{TEXT_SEC};font-size:.8rem;margin:0 0 .4rem'>"
+                    f"{area['pregunta']}</p>"
+                    + barra_html(pct_area, bar_color),
                     unsafe_allow_html=True)
 
-        for codigo, nombre, criterio, periodicidad in OBLIGACIONES_TRIBUTARIAS:
-            aplica = st.checkbox(
-                f"**{nombre}**",
-                key=f"trib_{codigo}",
-                help=f"Criterio: {criterio}"
-            )
-            if aplica:
-                st.markdown(f"<p style='color:{TEXT_SEC};font-size:.78rem;margin:-8px 0 4px 24px'>📅 {periodicidad}</p>",
-                            unsafe_allow_html=True)
+                nuevo_val = c_estado.selectbox(
+                    "", OPCIONES,
+                    index=OPCIONES.index(val),
+                    key=f"nd_{area['id']}",
+                    label_visibility="collapsed"
+                )
+
+                # Detalle según respuesta
+                if nuevo_val != "❓ Sin evaluar":
+                    if nuevo_val == "✅ Sí cumple":
+                        detalle = area["si"]
+                        d_color = SUCCESS
+                    elif nuevo_val == "⚠️ En proceso":
+                        detalle = area["proceso"]
+                        d_color = WARN
+                    else:
+                        detalle = area["no"]
+                        d_color = DANGER
+                        pendientes.append(area)
+
+                    st.markdown(
+                        f"<div style='background:{d_color}11;border-left:3px solid {d_color};"
+                        f"border-radius:4px;padding:.4rem .9rem;margin:.3rem 0 .6rem'>"
+                        f"<p style='color:{d_color};font-size:.8rem;margin:0'>{detalle}</p></div>",
+                        unsafe_allow_html=True)
+                elif nuevo_val == "⚠️ En proceso":
+                    pendientes.append(area)
+
+                st.markdown("<div style='height:.2rem'></div>", unsafe_allow_html=True)
+
+        # ── Panel de resultados ────────────────────────────────
+        st.markdown("---")
+        respondidas = len(scores)
+        if respondidas == 0:
+            st.info("👆 Responde las preguntas arriba para ver tu nivel de cumplimiento.")
+        else:
+            pct_global = sum(scores) / respondidas
+            color_g, label_g = semaforo(pct_global)
+
+            # Tarjeta resumen
+            st.markdown(
+                f"<div style='background:{BG_CARD};border:2px solid {color_g}33;"
+                f"border-radius:12px;padding:1.2rem 1.5rem;text-align:center;margin-bottom:1rem'>"
+                f"<p style='color:{TEXT_SEC};font-size:.82rem;margin:0 0 .2rem'>"
+                f"{respondidas} de {len(AREAS)} áreas evaluadas</p>"
+                f"<p style='color:{color_g};font-weight:700;font-size:2rem;margin:0'>"
+                f"{pct_global:.0f}%</p>"
+                f"<p style='color:{color_g};font-size:.95rem;font-weight:600;margin:.1rem 0 .5rem'>"
+                f"{label_g}</p>"
+                + barra_html(pct_global, color_g) +
+                f"</div>",
+                unsafe_allow_html=True)
+
+            # Gráfico araña / radar
+            if respondidas >= 3:
+                areas_eval  = [a for a in AREAS if OP_SCORES.get(
+                    st.session_state.get(f"nd_{a['id']}", "❓ Sin evaluar")) is not None]
+                nombres_r   = [a["titulo"].split(" ", 1)[1][:20] for a in areas_eval]
+                valores_r   = [OP_SCORES[st.session_state.get(f"nd_{a['id']}", "❓ Sin evaluar")]
+                               for a in areas_eval]
+                nombres_r  += [nombres_r[0]]
+                valores_r  += [valores_r[0]]
+
+                fig = go.Figure(go.Scatterpolar(
+                    r=valores_r, theta=nombres_r, fill="toself",
+                    fillcolor=f"{ACCENT}22", line_color=ACCENT, line_width=2,
+                ))
+                fig.update_layout(
+                    polar=dict(
+                        bgcolor=BG_CARD,
+                        radialaxis=dict(visible=True, range=[0, 100],
+                                        gridcolor=BORDER, tickfont_color=TEXT_SEC),
+                        angularaxis=dict(gridcolor=BORDER, tickfont_color="#E8F4FD",
+                                         tickfont_size=10),
+                    ),
+                    paper_bgcolor=BG_DARK, font_color="#E8F4FD",
+                    height=340, margin=dict(l=40, r=40, t=20, b=20),
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+            # Plan de acción
+            gaps = [a for a in AREAS
+                    if st.session_state.get(f"nd_{a['id']}", "❓ Sin evaluar")
+                    in ("❌ No cumple", "⚠️ En proceso")]
+            if gaps:
+                st.markdown(
+                    f"<p style='color:{ACCENT};font-weight:600;margin:.5rem 0 .4rem'>"
+                    f"📌 Acciones prioritarias ({len(gaps)} áreas)</p>",
+                    unsafe_allow_html=True)
+                for a in gaps:
+                    est = st.session_state.get(f"nd_{a['id']}")
+                    ec  = DANGER if est == "❌ No cumple" else WARN
+                    st.markdown(
+                        f"<div style='background:{BG_CARD};border-left:3px solid {ec};"
+                        f"border-radius:6px;padding:.6rem 1rem;margin-bottom:.4rem'>"
+                        f"<p style='color:#E8F4FD;font-weight:600;font-size:.86rem;margin:0 0 .15rem'>"
+                        f"{a['titulo']}</p>"
+                        f"<p style='color:{TEXT_SEC};font-size:.81rem;margin:0'>{a['accion']}</p>"
+                        f"</div>",
+                        unsafe_allow_html=True)
+
+            # CTA asesoría
+            st.markdown(
+                f"<div style='background:{BG_CARD};border-left:4px solid {ACCENT};"
+                f"border-radius:8px;padding:.9rem 1.2rem;margin-top:.8rem'>"
+                f"<p style='color:{ACCENT};font-weight:600;margin:0 0 .2rem'>"
+                f"💼 ¿Necesitas apoyo para cerrar estas brechas?</p>"
+                f"<p style='color:{TEXT_SEC};font-size:.83rem;margin:0'>"
+                f"En SalazAnalytics te acompañamos con convergencia NIIF, políticas contables, "
+                f"re-expresión de estados financieros, auditoría NIA y presentación a "
+                f"Supersociedades, SIC y DIAN.</p></div>",
+                unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════════════
-    # TAB 2 — CHECKLIST
+    # TAB 2 — REPORTE
     # ═══════════════════════════════════════════════════════════
     with tab2:
-        grupo = st.session_state.get("niif_grupo", 2)
-        checklist = get_checklist(grupo)
-        g_label = f"Grupo {grupo} — {'NIIF para Pymes' if grupo == 2 else 'Contabilidad Simplificada'}"
-        st.markdown(f"### ✅ Checklist {g_label}")
-        st.markdown(f"<p style='color:{TEXT_SEC};font-size:.83rem'>Para cada punto indica el estado actual de tu empresa.</p>",
-                    unsafe_allow_html=True)
-
-        OPCIONES = ["❌ No cumple", "⚠️ En proceso", "✅ Cumple", "➖ No aplica"]
-        COLORES  = {"✅ Cumple": SUCCESS, "⚠️ En proceso": WARN,
-                    "❌ No cumple": DANGER, "➖ No aplica": TEXT_SEC}
-
-        total_items = 0; total_cumple = 0; total_proceso = 0; total_no = 0
-
-        for area, items in checklist.items():
-            with st.expander(area, expanded=False):
-                for codigo, descripcion, prioridad in items:
-                    col_d, col_s = st.columns([3, 1])
-                    p_color = DANGER if prioridad == "Alta" else (WARN if prioridad == "Media" else TEXT_SEC)
-                    col_d.markdown(
-                        f"<p style='margin:.2rem 0;font-size:.87rem'>{descripcion} "
-                        f"<span style='color:{p_color};font-size:.72rem;font-weight:600'>[{prioridad}]</span></p>",
-                        unsafe_allow_html=True)
-                    val = col_s.selectbox("", OPCIONES, key=f"chk_{codigo}",
-                                          label_visibility="collapsed")
-                    if val != "➖ No aplica":
-                        total_items += 1
-                        if val == "✅ Cumple": total_cumple += 1
-                        elif val == "⚠️ En proceso": total_proceso += 1
-                        elif val == "❌ No cumple": total_no += 1
-
-        st.session_state["niif_totales"] = (total_items, total_cumple, total_proceso, total_no)
-
-        if total_items > 0:
-            pct = total_cumple / total_items * 100
-            color, label = semaforo_color(pct)
-            st.markdown(f"""<div style="background:{BG_CARD};border:1px solid {BORDER};
-                border-radius:8px;padding:.8rem 1.2rem;margin-top:1rem;text-align:center">
-                <p style="color:{color};font-size:1.4rem;font-weight:700;margin:0">{pct:.0f}% de cumplimiento</p>
-                <p style="color:{TEXT_SEC};font-size:.85rem;margin:.2rem 0 0">{label} · {total_cumple}/{total_items} ítems cumplidos</p>
-                </div>""", unsafe_allow_html=True)
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB 3 — SEMÁFORO
-    # ═══════════════════════════════════════════════════════════
-    with tab3:
-        grupo = st.session_state.get("niif_grupo", 2)
-        checklist = get_checklist(grupo)
-        st.markdown("### 🚦 Semáforo de cumplimiento por área")
-
-        areas_data = []
-        for area, items in checklist.items():
-            cumple = proceso = no = 0
-            for codigo, _, _ in items:
-                val = st.session_state.get(f"chk_{codigo}", "❌ No cumple")
-                if val == "✅ Cumple": cumple += 1
-                elif val == "⚠️ En proceso": proceso += 1
-                elif val == "❌ No cumple": no += 1
-            total = cumple + proceso + no
-            pct = cumple / total * 100 if total > 0 else 0
-            areas_data.append({"area": area, "cumple": cumple, "proceso": proceso,
-                                "no": no, "total": total, "pct": pct})
-
-        # Gráfico de barras horizontales
-        areas_data.sort(key=lambda x: x["pct"])
-        nombres = [a["area"].split("—")[0].strip() for a in areas_data]
-        pcts    = [a["pct"] for a in areas_data]
-        colores = [semaforo_color(p)[0] for p in pcts]
-
-        fig = go.Figure(go.Bar(
-            y=nombres, x=pcts, orientation="h",
-            marker_color=colores,
-            text=[f"{p:.0f}%" for p in pcts],
-            textposition="outside",
-        ))
-        fig.add_vline(x=75, line_dash="dash", line_color=SUCCESS, opacity=0.5,
-                      annotation_text="Meta 75%", annotation_font_color=SUCCESS)
-        fig.add_vline(x=50, line_dash="dot", line_color=WARN, opacity=0.4)
-        fig.update_layout(
-            paper_bgcolor=BG_DARK, plot_bgcolor=BG_DARK,
-            font_color="#E8F4FD", height=400,
-            xaxis=dict(range=[0, 115], title="% Cumplimiento"),
-            yaxis=dict(title=""),
-            margin=dict(l=10, r=60, t=20, b=20),
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Cards por área
-        cols = st.columns(3)
-        for i, a in enumerate(sorted(areas_data, key=lambda x: x["pct"], reverse=True)):
-            color, label = semaforo_color(a["pct"])
-            cols[i % 3].markdown(
-                card(a["area"].split("—")[0].strip()[:28],
-                     f"{a['pct']:.0f}%", color,
-                     f"✅{a['cumple']} ⚠️{a['proceso']} ❌{a['no']}"),
-                unsafe_allow_html=True)
-            cols[i % 3].markdown("<div style='margin:.3rem'></div>", unsafe_allow_html=True)
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB 4 — RECOMENDACIONES
-    # ═══════════════════════════════════════════════════════════
-    with tab4:
-        grupo = st.session_state.get("niif_grupo", 2)
-        checklist = get_checklist(grupo)
-        st.markdown("### 📌 Plan de acción priorizado")
-        st.markdown(f"<p style='color:{TEXT_SEC}'>Ítems que requieren atención, ordenados por impacto.</p>",
-                    unsafe_allow_html=True)
-
-        pendientes = []
-        for area, items in checklist.items():
-            for codigo, desc, prioridad in items:
-                val = st.session_state.get(f"chk_{codigo}", "❌ No cumple")
-                if val in ("❌ No cumple", "⚠️ En proceso"):
-                    pendientes.append({
-                        "Estado": val, "Área": area.split("—")[0].strip(),
-                        "Acción requerida": desc, "Prioridad": prioridad,
-                        "_ord": {"Alta": 0, "Media": 1, "Baja": 2}[prioridad]
-                    })
-
-        pendientes.sort(key=lambda x: (x["_ord"], x["Estado"]))
-
-        if not pendientes:
-            st.success("🎉 ¡Excelente! No hay ítems pendientes en el checklist.")
-        else:
-            # Agrupar por prioridad
-            for nivel in ["Alta", "Media", "Baja"]:
-                grupo_items = [p for p in pendientes if p["Prioridad"] == nivel]
-                if not grupo_items:
-                    continue
-                color = DANGER if nivel == "Alta" else (WARN if nivel == "Media" else TEXT_SEC)
-                st.markdown(f"<p style='color:{color};font-weight:600;font-size:.9rem;margin:.8rem 0 .3rem'>⚡ Prioridad {nivel} — {len(grupo_items)} ítem(s)</p>",
-                            unsafe_allow_html=True)
-                for p in grupo_items:
-                    estado_color = DANGER if p["Estado"] == "❌ No cumple" else WARN
-                    st.markdown(f"""<div style="background:{BG_CARD};border-left:3px solid {estado_color};
-                        border-radius:6px;padding:.6rem 1rem;margin-bottom:.4rem">
-                        <p style="color:#E8F4FD;font-size:.86rem;margin:0">{p['Acción requerida']}</p>
-                        <p style="color:{TEXT_SEC};font-size:.75rem;margin:.2rem 0 0">{p['Área']} · {p['Estado']}</p>
-                        </div>""", unsafe_allow_html=True)
-
-        # Servicios de asesoría disponibles
-        st.markdown("---")
-        st.markdown("#### 💼 Servicios de asesoría disponibles")
-        servicios = [
-            ("🔄", "Convergencia NIIF", "Transición completa al nuevo marco contable con plan de trabajo detallado."),
-            ("📝", "Políticas Contables", "Generación del manual de políticas contables adaptado a tu sector y actividad."),
-            ("📖", "Manuales de Procedimientos", "Documentación de procesos contables y financieros para tu equipo."),
-            ("⚖️", "Re-expresión de Estados", "Ajuste y presentación de estados financieros bajo NIIF con períodos comparativos."),
-            ("🔍", "Auditoría NIA", "Auditoría financiera bajo Normas Internacionales de Auditoría."),
-            ("🏛️", "Información a Entidades", "Preparación de reportes para Supersociedades, SIC, DIAN y demás entidades."),
-        ]
-        cols = st.columns(2)
-        for i, (icono, titulo, desc) in enumerate(servicios):
-            cols[i % 2].markdown(f"""<div style="background:{BG_CARD};border:1px solid {BORDER};
-                border-radius:8px;padding:.7rem 1rem;margin-bottom:.5rem">
-                <p style="color:{ACCENT};font-weight:600;margin:0 0 .2rem">{icono} {titulo}</p>
-                <p style="color:{TEXT_SEC};font-size:.8rem;margin:0">{desc}</p>
-                </div>""", unsafe_allow_html=True)
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB 5 — REPORTE
-    # ═══════════════════════════════════════════════════════════
-    with tab5:
-        grupo = st.session_state.get("niif_grupo", 2)
-        checklist = get_checklist(grupo)
-        nombre_emp = st.session_state.get("niif_nombre", "Mi Empresa")
-        totales = st.session_state.get("niif_totales", (0, 0, 0, 0))
-        total_items, total_cumple, total_proceso, total_no = totales
-        pct_global = total_cumple / total_items * 100 if total_items > 0 else 0
+        nombre_emp = st.session_state.get("nd_nombre", "Mi Empresa")
+        grupo_val  = st.session_state.get("nd_grupo",  "Grupo 2 — NIIF Pymes")
+        scores_r   = [OP_SCORES[st.session_state.get(f"nd_{a['id']}", "❓ Sin evaluar")]
+                      for a in AREAS
+                      if OP_SCORES[st.session_state.get(f"nd_{a['id']}", "❓ Sin evaluar")] is not None]
+        pct_r      = sum(scores_r) / len(scores_r) if scores_r else 0
+        color_r, label_r = semaforo(pct_r)
+        fecha_hoy  = datetime.now().strftime("%d de %B de %Y")
 
         st.markdown("### 📄 Reporte de diagnóstico")
-        st.markdown(f"<p style='color:{TEXT_SEC}'>Genera el reporte para compartir con tu contador o junta directiva.</p>",
-                    unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='background:{BG_CARD};border:1px solid {BORDER};border-radius:12px;"
+            f"padding:1.2rem 1.5rem;margin-bottom:1rem'>"
+            f"<p style='color:{ACCENT};font-weight:700;font-size:1.05rem;margin:0 0 .2rem'>"
+            f"🏛️ Diagnóstico NIIF — {nombre_emp or 'Mi Empresa'}</p>"
+            f"<p style='color:{TEXT_SEC};font-size:.8rem;margin:0 0 .6rem'>"
+            f"Generado el {fecha_hoy} · {grupo_val} · SalazAnalytics</p>"
+            f"<p style='color:{color_r};font-weight:700;font-size:1.3rem;margin:0'>"
+            f"{pct_r:.0f}% cumplimiento — {label_r}</p>"
+            f"<p style='color:{TEXT_SEC};font-size:.81rem;margin:.3rem 0 0'>"
+            f"{len(scores_r)} de {len(AREAS)} áreas evaluadas</p></div>",
+            unsafe_allow_html=True)
 
-        # Vista previa
-        fecha_hoy = datetime.now().strftime("%d de %B de %Y")
-        g_label = f"Grupo {grupo} — {'NIIF para Pymes' if grupo == 2 else 'Contabilidad Simplificada' if grupo == 3 else 'NIIF Plenas'}"
-        color_g, label_g = semaforo_color(pct_global)
-
-        st.markdown(f"""<div style="background:{BG_CARD};border:1px solid {BORDER};border-radius:12px;padding:1.2rem 1.5rem">
-            <p style="color:{ACCENT};font-weight:700;font-size:1.1rem;margin:0 0 .3rem">
-                🏛️ Diagnóstico NIIF — {nombre_emp or 'Mi Empresa'}</p>
-            <p style="color:{TEXT_SEC};font-size:.82rem;margin:0 0 .8rem">Generado el {fecha_hoy} · SalazAnalytics</p>
-            <p style="color:{TEXT_SEC};font-size:.85rem;margin:0">Clasificación: <strong style="color:{ACCENT}">{g_label}</strong></p>
-            <p style="color:{color_g};font-weight:700;font-size:1.2rem;margin:.4rem 0">
-                {pct_global:.0f}% cumplimiento global — {label_g}</p>
-            <p style="color:{TEXT_SEC};font-size:.82rem">
-                ✅ Cumple: {total_cumple} · ⚠️ En proceso: {total_proceso} · ❌ Pendiente: {total_no}</p>
-            </div>""", unsafe_allow_html=True)
-
-        # Generar Excel
         try:
             import openpyxl
-            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-            from openpyxl.utils import get_column_letter
-
-            wb = openpyxl.Workbook()
-            ws = wb.active
+            from openpyxl.styles import Font, PatternFill, Alignment
+            wb  = openpyxl.Workbook()
+            ws  = wb.active
             ws.title = "Diagnóstico NIIF"
 
-            # Estilos
             hdr_fill = PatternFill("solid", fgColor="0D1B2A")
             sub_fill = PatternFill("solid", fgColor="132030")
-            hdr_font = Font(bold=True, color="00C2FF", size=11)
-            sub_font = Font(bold=True, color="E8F4FD", size=10)
-            normal_font = Font(color="E8F4FD", size=9)
-            thin = Border(
-                left=Side(style='thin', color='1a3a5c'),
-                right=Side(style='thin', color='1a3a5c'),
-                bottom=Side(style='thin', color='1a3a5c'),
-            )
 
-            # Encabezado
             ws.merge_cells("A1:E1")
             ws["A1"] = f"DIAGNÓSTICO NIIF — {nombre_emp or 'Mi Empresa'}"
-            ws["A1"].font = Font(bold=True, color="00C2FF", size=14)
+            ws["A1"].font = Font(bold=True, color="00C2FF", size=13)
             ws["A1"].fill = hdr_fill
             ws["A1"].alignment = Alignment(horizontal="center")
 
             ws.merge_cells("A2:E2")
-            ws["A2"] = f"Generado: {fecha_hoy} | Clasificación: {g_label} | Cumplimiento: {pct_global:.0f}%"
+            ws["A2"] = f"Generado: {fecha_hoy} | {grupo_val} | Cumplimiento global: {pct_r:.0f}% — {label_r}"
             ws["A2"].font = Font(color="7B9BB5", size=10)
             ws["A2"].fill = hdr_fill
             ws["A2"].alignment = Alignment(horizontal="center")
 
             ws.append([])
-            headers = ["Área", "Ítem", "Prioridad", "Estado", "Observaciones"]
-            ws.append(headers)
-            for i, h in enumerate(headers, 1):
-                cell = ws.cell(row=4, column=i)
-                cell.font = hdr_font
-                cell.fill = hdr_fill
-                cell.alignment = Alignment(horizontal="center")
-                cell.border = thin
+            for h, col in zip(["Área", "Estado", "Detalle", "Acción recomendada"], range(1, 5)):
+                c = ws.cell(row=4, column=col, value=h)
+                c.font = Font(bold=True, color="00C2FF", size=10)
+                c.fill = hdr_fill
 
-            row = 5
-            STATUS_COLORS = {
-                "✅ Cumple": "00FFB3",
-                "⚠️ En proceso": "FFD93D",
-                "❌ No cumple": "FF6B6B",
-                "➖ No aplica": "7B9BB5",
+            STATUS_MAP = {
+                "✅ Sí cumple":  ("✅ Cumple",      "00FFB3"),
+                "⚠️ En proceso": ("⚠️ En proceso",  "FFD93D"),
+                "❌ No cumple":  ("❌ No cumple",    "FF6B6B"),
+                "❓ Sin evaluar": ("— Sin evaluar",  "7B9BB5"),
             }
-            for area, items in checklist.items():
-                for codigo, desc, prioridad in items:
-                    val = st.session_state.get(f"chk_{codigo}", "❌ No cumple")
-                    p_color = "FF6B6B" if prioridad == "Alta" else ("FFD93D" if prioridad == "Media" else "7B9BB5")
-                    s_color = STATUS_COLORS.get(val, "7B9BB5")
-                    data = [area.split("—")[0].strip(), desc, prioridad, val, ""]
-                    ws.append(data)
-                    for col in range(1, 6):
-                        cell = ws.cell(row=row, column=col)
-                        cell.fill = sub_fill
-                        cell.font = Font(color=s_color if col == 4 else ("FF6B6B" if (col == 3 and prioridad == "Alta") else "E8F4FD"), size=9)
-                        cell.border = thin
-                        cell.alignment = Alignment(wrap_text=True, vertical="top")
-                    row += 1
+            for a in AREAS:
+                val  = st.session_state.get(f"nd_{a['id']}", "❓ Sin evaluar")
+                st_label, st_color = STATUS_MAP[val]
+                if val == "✅ Sí cumple":   detalle = a["si"]
+                elif val == "⚠️ En proceso": detalle = a["proceso"]
+                elif val == "❌ No cumple":  detalle = a["no"]
+                else:                        detalle = "No evaluado"
+                row = ws.max_row + 1
+                ws.cell(row=row, column=1, value=a["titulo"]).fill = sub_fill
+                c2 = ws.cell(row=row, column=2, value=st_label)
+                c2.font = Font(color=st_color, bold=True, size=9)
+                c2.fill = sub_fill
+                ws.cell(row=row, column=3, value=detalle).fill = sub_fill
+                ws.cell(row=row, column=4, value=a["accion"] if val != "✅ Sí cumple" else "—").fill = sub_fill
+                for col in range(1, 5):
+                    ws.cell(row=row, column=col).font = ws.cell(row=row, column=col).font.copy(
+                        color=st_color if col == 2 else "E8F4FD", size=9)
+                    ws.cell(row=row, column=col).alignment = Alignment(wrap_text=True, vertical="top")
 
-            ws.column_dimensions["A"].width = 28
-            ws.column_dimensions["B"].width = 55
-            ws.column_dimensions["C"].width = 12
-            ws.column_dimensions["D"].width = 18
-            ws.column_dimensions["E"].width = 30
-
-            # Hoja de obligaciones
-            ws2 = wb.create_sheet("Obligaciones Tributarias")
-            ws2.merge_cells("A1:D1")
-            ws2["A1"] = "OBLIGACIONES TRIBUTARIAS APLICABLES"
-            ws2["A1"].font = Font(bold=True, color="00C2FF", size=12)
-            ws2["A1"].fill = hdr_fill
-            ws2["A1"].alignment = Alignment(horizontal="center")
-            ws2.append([])
-            ws2.append(["Obligación", "Aplica", "Criterio", "Periodicidad"])
-            for col in range(1, 5):
-                ws2.cell(row=3, column=col).font = hdr_font
-                ws2.cell(row=3, column=col).fill = hdr_fill
-            for codigo, nombre, criterio, periodicidad in OBLIGACIONES_TRIBUTARIAS:
-                aplica = "✅ Sí" if st.session_state.get(f"trib_{codigo}", False) else "❌ No"
-                ws2.append([nombre, aplica, criterio, periodicidad])
-            ws2.column_dimensions["A"].width = 35
-            ws2.column_dimensions["B"].width = 10
-            ws2.column_dimensions["C"].width = 50
-            ws2.column_dimensions["D"].width = 35
+            for col, w in zip("ABCD", [35, 18, 55, 50]):
+                ws.column_dimensions[col].width = w
 
             buf = BytesIO()
-            wb.save(buf)
-            buf.seek(0)
-
+            wb.save(buf); buf.seek(0)
             st.download_button(
-                label="📥 Descargar reporte Excel",
-                data=buf,
+                "📥 Descargar reporte Excel", data=buf,
                 file_name=f"Diagnostico_NIIF_{(nombre_emp or 'empresa').replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
+                use_container_width=True)
         except Exception as e:
             st.error(f"Error generando Excel: {e}")
-
-        st.markdown(f"""<div style="background:{BG_CARD};border-left:4px solid {ACCENT};
-            border-radius:8px;padding:.8rem 1.2rem;margin-top:1rem">
-            <p style="color:{ACCENT};font-weight:600;margin:0 0 .2rem">💡 ¿Necesitas asesoría?</p>
-            <p style="color:{TEXT_SEC};font-size:.84rem;margin:0">
-            En SalazAnalytics te acompañamos en convergencia NIIF, políticas contables,
-            re-expresión de estados y auditoría bajo NIA. Escríbenos para una propuesta personalizada.</p>
-            </div>""", unsafe_allow_html=True)
