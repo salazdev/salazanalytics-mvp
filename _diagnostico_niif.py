@@ -254,7 +254,7 @@ def show():
         st.markdown(f"<p style='color:{TEXT_SEC};font-size:.83rem'>Para cada punto indica el estado actual de tu empresa.</p>",
                     unsafe_allow_html=True)
 
-        OPCIONES = ["✅ Cumple", "⚠️ En proceso", "❌ No cumple", "➖ No aplica"]
+        OPCIONES = ["❌ No cumple", "⚠️ En proceso", "✅ Cumple", "➖ No aplica"]
         COLORES  = {"✅ Cumple": SUCCESS, "⚠️ En proceso": WARN,
                     "❌ No cumple": DANGER, "➖ No aplica": TEXT_SEC}
 
