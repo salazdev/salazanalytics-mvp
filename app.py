@@ -52,7 +52,7 @@ div[data-testid="stFileUploader"] { background: #132030; border: 2px dashed #1a3
 st.markdown(css, unsafe_allow_html=True)
 
 def load_module(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
+    spec = importlib.util.spec_from_file_location(name, str(path))
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
     spec.loader.exec_module(mod)
@@ -72,7 +72,7 @@ def mostrar_logo(width=220):
             unsafe_allow_html=True
         )
     else:
-        st.markdown("<h2 style='color:#00C2FF;text-align:center;'>SalazAnalytics</h2>",
+        st.markdown("<h2 style='color:#00C2FF;text-align:center;'>SALAZ ANALYTICS Plataforma Inteligente de Gestión</h2>",
                     unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
@@ -224,25 +224,6 @@ def pantalla_mi_empresa():
 # ─────────────────────────────────────────────
 # APP PRINCIPAL
 # ─────────────────────────────────────────────
-# En el radio del menú, agrega:
-"💰 Flujo de Caja",
-"📊 Flujo Indirecto",
-"👥 Nómina",
-# En los elif del router:
-# Router — agrega antes del elif "Mi Empresa":
-elif "Flujo"        in page: load_module("flujo_caja",     base/"_flujo_caja.py").show()
-elif "Mi Empresa"   in page: pantalla_mi_empresa()
-
-elif "Flujo" in page: load_module("flujo_caja", base/"_flujo_caja.py").show()
-# Radio del menú — agrega la línea nueva:
-page = st.radio("Menu", [
-    "🏠 Inicio", "⚖️ Revisoria y Cumplimiento", "🔮 Mirofish Predictor",
-    "📊 Dashboards Financieros", "📗 Auditoria de Excel",
-    "💬 Consultor Contable IA", "⚙️ Automatizacion n8n",
-    "🔍 Anomalias", "📑 Exportar", "🧾 Facturacion",
-    "📒 Contabilidad", "💰 Flujo de Caja",   # ← nueva línea
-    "🏢 Mi Empresa",
-], label_visibility="collapsed", key="pagina_actual")
 
 def app_principal():
     base    = Path(__file__).parent
@@ -269,7 +250,7 @@ def app_principal():
             "📊 Dashboards Financieros", "📗 Auditoria de Excel",
             "💬 Consultor Contable IA", "⚙️ Automatizacion n8n",
             "🔍 Anomalias", "📑 Exportar", "🧾 Facturacion",
-            "📒 Contabilidad", "💰 Flujo de Caja", "🏢 Mi Empresa",
+            "📒 Contabilidad", "💰 Flujo de Caja", "📊 Flujo Indirecto", "👥 Nómina", "🏢 Mi Empresa",
         ], label_visibility="collapsed", key="pagina_actual")
 
         st.divider()
@@ -280,19 +261,19 @@ def app_principal():
         st.markdown("<p style='color:#7B9BB5;font-size:.72rem;text-align:center'>"
                     "salazanalytics.com</p>", unsafe_allow_html=True)
 
-    if   "Inicio"       in page: load_module("home",          base/"_home.py").show()
-    elif "Revisor"      in page: load_module("pdf_ia",         base/"_pdf_ia.py").show()
-    elif "Mirofish"     in page: load_module("ml_prediccion",  base/"_ml_prediccion.py").show()
-    elif "Dashboards"   in page: load_module("dashboards",     base/"_dashboards.py").show()
-    elif "Excel"        in page: load_module("excel_ia",       base/"_excel_ia.py").show()
-    elif "Consultor"    in page: load_module("chat_datos",     base/"_chat_datos.py").show()
-    elif "Anomalias"    in page: load_module("anomalias",      base/"_anomalias.py").show()
-    elif "Exportar"     in page: load_module("exportar",       base/"_exportar.py").show()
-    elif "Factura"      in page: load_module("facturacion",    base/"_facturacion.py").show()
-    elif "Indirecto"    in page: load_module("flujo_indirecto", base/"_flujo_indirecto.py").show()
-    elif "Flujo"        in page: load_module("flujo_caja",     base/"_flujo_caja.py").show()
-    elif "Contabilidad" in page: load_module("contabilidad",   base/"_contabilidad.py").show()    
-    elif "Nómina"       in page: load_module("simulador_nomina", base/"_simulador_nomina.py").show()
+    if   "Inicio"       in page: load_module("home",          base / "_home.py").show()
+    elif "Revisor"      in page: load_module("pdf_ia",        base / "_pdf_ia.py").show()
+    elif "Mirofish"     in page: load_module("ml_prediccion", base / "_ml_prediccion.py").show()
+    elif "Dashboards"   in page: load_module("dashboards",    base / "_dashboards.py").show()
+    elif "Excel"        in page: load_module("excel_ia",      base / "_excel_ia.py").show()
+    elif "Consultor"    in page: load_module("chat_datos",    base / "_chat_datos.py").show()
+    elif "Anomalias"    in page: load_module("anomalias",     base / "_anomalias.py").show()
+    elif "Exportar"     in page: load_module("exportar",      base / "_exportar.py").show()
+    elif "Factura"      in page: load_module("facturacion",   base / "_facturacion.py").show()
+    elif "Indirecto"    in page: load_module("flujo_indirecto", base / "_flujo_indirecto.py").show()
+    elif "Flujo"        in page: load_module("flujo_caja",    base / "_flujo_caja.py").show()
+    elif "Contabilidad" in page: load_module("contabilidad",  base / "_contabilidad.py").show()    
+    elif "Nómina"       in page: load_module("simulador_nomina", base / "_simulador_nomina.py").show()
     elif "Mi Empresa"   in page: pantalla_mi_empresa()
 
 if not st.session_state.get("logged_in"):
